@@ -1,3 +1,4 @@
+from PySide6.QtCore import Qt
 from PySide6.QtGui import QFontDatabase
 from PySide6.QtWidgets import (
     QAbstractItemView, QFileDialog, QHBoxLayout, QLabel, QLineEdit,
@@ -59,6 +60,7 @@ class TaskPanel(QWidget):
         heading.setObjectName('heading')
         self.layout.addWidget(heading)
         caption = QLabel(description)
+        caption.setTextFormat(Qt.TextFormat.PlainText)
         caption.setWordWrap(True)
         self.layout.addWidget(caption)
         self.actions = QHBoxLayout()
@@ -69,6 +71,7 @@ class TaskPanel(QWidget):
         self.actions.addWidget(self.cancel_button)
         self.actions.addStretch()
         self.status = QLabel('Ready.')
+        self.status.setTextFormat(Qt.TextFormat.PlainText)
         self.status.setWordWrap(True)
         self.cancel_button.clicked.connect(self.cancel)
 

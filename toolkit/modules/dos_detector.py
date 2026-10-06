@@ -26,6 +26,14 @@ def detect_spikes(events, threshold=100, task=None):
         counts.items(), key=lambda item: (item[0][1], item[0][0])) if count > threshold]
 
 
+def readiness():
+    try:
+        import scapy
+    except ImportError:
+        return 'CSV/log ready; install Scapy for saved PCAP files.'
+    return ''
+
+
 def create_panel(context):
     from PySide6.QtWidgets import QHBoxLayout, QLabel, QSpinBox
     from toolkit.traffic import input_summary, read_traffic, utc_label

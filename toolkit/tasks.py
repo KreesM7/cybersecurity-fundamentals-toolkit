@@ -29,10 +29,10 @@ class TaskHandle(QObject):
 
     def __init__(self, parent):
         super().__init__(parent)
-        self.event = Event()
+        self.cancel_event = Event()
 
     def cancel(self):
-        self.event.set()
+        self.cancel_event.set()
 
 
 class Worker(QRunnable):
@@ -41,7 +41,7 @@ class Worker(QRunnable):
         self.handle, self.work = handle, work
 
     def run(self):
-        task = TaskContext(self.handle.event, self.handle.progress.emit)
+        task = TaskContext(self.handle.cancel_event, self.handle.progress.emit)
         try:
             task.check()
             result = self.work(task)
@@ -82,3 +82,8 @@ class AppContext(QObject):
     def cancel_all(self):
         for handle in tuple(self.jobs):
             handle.cancel()
+
+    @staticmethod
+    def resource_text(name):
+        from toolkit.core import resource_text
+        return resource_text(name)

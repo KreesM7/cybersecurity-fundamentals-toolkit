@@ -219,6 +219,15 @@ def test_form(source_url, form, fields, owned=False, allow_post=False, task=None
     return findings
 
 
+def readiness():
+    try:
+        import urllib3
+        import bs4
+    except ImportError as exc:
+        return 'Setup needed: install requirements.txt. ' + str(exc)
+    return ''
+
+
 def create_panel(context):
     from PySide6.QtCore import Qt
     from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton, QTableWidget, QTableWidgetItem

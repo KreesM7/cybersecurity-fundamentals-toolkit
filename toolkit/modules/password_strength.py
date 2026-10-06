@@ -47,6 +47,15 @@ def format_time(seconds):
     return f'{seconds:.3g} seconds'
 
 
+def readiness():
+    try:
+        import zxcvbn
+        common_passwords()
+    except (ImportError, OSError) as exc:
+        return 'Setup needed: install requirements.txt and restore bundled resources. ' + str(exc)
+    return ''
+
+
 def create_panel(context):
     from PySide6.QtWidgets import QCheckBox, QLineEdit, QPlainTextEdit, QPushButton
     from toolkit.widgets import TaskPanel, technical_font

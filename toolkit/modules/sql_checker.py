@@ -88,15 +88,18 @@ class LimitedClient:
                                               assert_hostname=target.host, cert_reqs='CERT_REQUIRED')
         else:
             pool = urllib3.HTTPConnectionPool(**options)
-        connection = [None]
+        transport = [None]
         deadline = time.monotonic() + REQUEST_SECONDS
+        io_deadline = [deadline]
         finished, expired = Event(), Event()
         connection_base = pool.ConnectionCls
 
         class TrackedConnection(connection_base):
             def connect(self):
                 super().connect()
-                connection[0] = self
+                # http.client may clear connection.sock for Connection: close
+                # while its response retains a buffered file on this socket.
+                transport[0] = self.sock
                 if client_task.event.is_set() or expired.is_set():
                     self.close()
                     client_task.check()
@@ -108,13 +111,13 @@ class LimitedClient:
         def guard():
             while not finished.wait(0.05):
                 cancelled = client_task.event.is_set()
-                if cancelled or time.monotonic() >= deadline:
+                if cancelled or time.monotonic() >= io_deadline[0]:
                     if not cancelled:
                         expired.set()
-                    active = connection[0]
-                    if active is not None and active.sock is not None:
+                    active = transport[0]
+                    if active is not None:
                         try:
-                            active.sock.shutdown(socket.SHUT_RDWR)
+                            active.shutdown(socket.SHUT_RDWR)
                         except OSError:
                             pass
                         active.close()
@@ -126,6 +129,7 @@ class LimitedClient:
         if method == 'POST':
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
         response = None
+        body_deadline = None
         watchdog.start()
         try:
             response = pool.urlopen(method, path, body=encoded.encode('utf-8') if method == 'POST' else None,
@@ -138,6 +142,7 @@ class LimitedClient:
                 raise ValueError('Compressed responses are unsupported; the server must honor Accept-Encoding: identity.')
             chunks, total = [], 0
             body_deadline = min(deadline, time.monotonic() + 10)
+            io_deadline[0] = body_deadline
             while True:
                 self.task.check()
                 if expired.is_set() or time.monotonic() > body_deadline:
@@ -156,8 +161,10 @@ class LimitedClient:
             return Response(response.status, b''.join(chunks).decode('utf-8', errors='replace'))
         except Exception as exc:
             self.task.check()
-            if expired.is_set():
+            if expired.is_set() or time.monotonic() >= io_deadline[0]:
                 raise ValueError('Whole-request time limit exceeded.') from exc
+            if body_deadline is not None and time.monotonic() >= body_deadline:
+                raise ValueError('Response exceeded the 10-second body-read limit.') from exc
             raise
         finally:
             finished.set()

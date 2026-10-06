@@ -16,6 +16,17 @@ class LabHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         type(self).requests.append(('GET', self.path))
         parsed = urlsplit(self.path)
+        if parsed.path == '/slow-chunks':
+            try:
+                self.wfile.write(b'HTTP/1.1 200 OK\r\nTransfer-Encoding: chunked\r\nConnection: close\r\n\r\n')
+                self.wfile.flush()
+                for byte in b'1;' + b'x' * 60 + b'\r\nx\r\n0\r\n\r\n':
+                    self.wfile.write(bytes([byte]))
+                    self.wfile.flush()
+                    time.sleep(0.05)
+            except OSError:
+                pass
+            return
         if parsed.path == '/slow-headers':
             try:
                 for byte in b'HTTP/1.1 200 OK\r\nContent-Length: 1\r\n\r\nx':
@@ -129,7 +140,7 @@ class SQLTests(unittest.TestCase):
         from unittest.mock import patch
         module = self.module()
         with patch.object(module, 'REQUEST_SECONDS', 0.3, create=True):
-            for path in ('/slow-headers', '/slow-body'):
+            for path in ('/slow-headers', '/slow-body', '/slow-chunks'):
                 start = time.monotonic()
                 with self.assertRaisesRegex(ValueError, 'deadline|time limit'):
                     module.LimitedClient().request(self.base + path)
@@ -138,18 +149,19 @@ class SQLTests(unittest.TestCase):
     def test_cancel_interrupts_slow_body(self):
         module = self.module()
         from toolkit.tasks import TaskContext, Cancelled
-        event = Event()
-        # Allow the global request gate to release before testing cancellation of I/O.
-        time.sleep(1.01)
-        timer = Timer(0.3, event.set)
-        timer.start()
-        start = time.monotonic()
-        try:
-            with self.assertRaises(Cancelled):
-                module.LimitedClient(TaskContext(event)).request(self.base + '/slow-body')
-            self.assertLess(time.monotonic() - start, 2)
-        finally:
-            timer.cancel()
+        for path in ('/slow-body', '/slow-chunks'):
+            event = Event()
+            # Allow the global request gate to release before testing cancellation of I/O.
+            time.sleep(1.01)
+            timer = Timer(0.3, event.set)
+            timer.start()
+            start = time.monotonic()
+            try:
+                with self.assertRaises(Cancelled):
+                    module.LimitedClient(TaskContext(event)).request(self.base + path)
+                self.assertLess(time.monotonic() - start, 2)
+            finally:
+                timer.cancel()
 
     def test_repetitive_response_comparison_has_bounded_work(self):
         module = self.module()

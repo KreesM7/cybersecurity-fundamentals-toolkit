@@ -3,6 +3,8 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from threading import Thread
 from threading import Event, Timer
 import time
+from pathlib import Path
+import ssl
 from urllib.parse import parse_qs, urlsplit
 import unittest
 
@@ -184,6 +186,26 @@ class SQLTests(unittest.TestCase):
         with self.assertRaisesRegex(ValueError, 'budget'):
             client.request(self.base + '/search')
         self.assertEqual(len(LabHandler.requests), before)
+
+    def test_untrusted_https_certificate_is_rejected(self):
+        module = self.module()
+        fixtures = Path(__file__).parent / 'fixtures'
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(fixtures / 'local-cert.txt', fixtures / 'local-key.txt')
+        server = ThreadingHTTPServer(('127.0.0.1', 0), LabHandler)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        thread = Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        before = len(LabHandler.requests)
+        try:
+            import urllib3
+            with self.assertRaises(urllib3.exceptions.SSLError):
+                module.LimitedClient().request(f'https://127.0.0.1:{server.server_port}/form')
+            self.assertEqual(len(LabHandler.requests), before)
+        finally:
+            server.shutdown()
+            server.server_close()
+            thread.join()
 
 
 if __name__ == '__main__':

@@ -29,9 +29,12 @@ class TrafficTests(unittest.TestCase):
         reader = self.reader()
         with tempfile.TemporaryDirectory() as folder:
             path = Path(folder) / 'access.log'
-            path.write_text('10.0.0.8 - - [06/Oct/2026:00:00:01 +0000] "GET / HTTP/1.1" 200 42\n')
-            event = reader.read_traffic(path, require_volume=True).events[0]
+            path.write_text('10.0.0.8 - - [06/Oct/2026:00:00:02 +0000] "GET / HTTP/1.1" 200 99\n'
+                            '10.0.0.8 - - [06/Oct/2026:00:00:01 +0000] "GET / HTTP/1.1" 200 42\n')
+            events = reader.read_traffic(path, require_volume=True).events
+            event = events[0]
             self.assertEqual((event.source_ip, event.bytes, event.protocol), ('10.0.0.8', 42, 'HTTP'))
+            self.assertEqual([event.bytes for event in events], [42, 99])
         with self.assertRaises(ValueError):
             reader.parse_timestamp('2026-10-06T00:00:01')
         with self.assertRaises(ValueError):
@@ -55,6 +58,14 @@ class TrafficTests(unittest.TestCase):
             path.write_bytes(original[:-4])
             with self.assertRaises(ValueError):
                 reader.read_traffic(path)
+            from scapy.utils import PcapNgWriter
+            ng_path = Path(folder) / 'sample.pcapng'
+            with PcapNgWriter(str(ng_path)) as writer:
+                writer.write(packet)
+            self.assertEqual(reader.read_traffic(ng_path).unit, 'packets')
+            ng_path.write_bytes(ng_path.read_bytes()[:-4])
+            with self.assertRaises(ValueError):
+                reader.read_traffic(ng_path)
             path.write_bytes(b'not a capture')
             with self.assertRaises(ValueError):
                 reader.read_traffic(path)

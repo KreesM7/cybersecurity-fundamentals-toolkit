@@ -1,7 +1,7 @@
 import sys
 
 from PySide6.QtCore import QTimer
-from PySide6.QtGui import QColor, QPalette
+from PySide6.QtGui import QColor, QFont, QPalette
 from PySide6.QtWidgets import (
     QApplication, QHBoxLayout, QLabel, QListWidget, QMainWindow,
     QPlainTextEdit, QStackedWidget, QVBoxLayout, QWidget,
@@ -59,6 +59,7 @@ class MainWindow(QMainWindow):
                 status = 'Setup needed: ' + str(exc)
             rows.append((entry.spec.title if entry.spec else entry.name, status))
         fill_table(self.readiness_table, rows)
+        self.readiness_table.resizeRowsToContents()
 
     def select_module(self, row):
         if row <= 0:
@@ -101,6 +102,7 @@ class MainWindow(QMainWindow):
 
 def configure_theme(app):
     app.setStyle('Fusion')
+    app.setFont(QFont('Segoe UI', 10))
     palette = QPalette()
     for role, color in (
         (QPalette.ColorRole.Window, '#202124'),
@@ -120,14 +122,41 @@ def configure_theme(app):
     palette.setColor(QPalette.ColorGroup.Disabled, QPalette.ColorRole.ButtonText, QColor('#8d939b'))
     app.setPalette(palette)
     app.setStyleSheet('QLabel#heading { font-size: 20px; font-weight: 600; } '
-                     'QPushButton { padding: 5px 12px; border-radius: 0px; } '
-                     'QListWidget::item { padding: 9px 6px; }')
+                     'QPushButton { padding: 5px 12px; border: 1px solid #454950; '
+                     'border-radius: 0px; background-color: #30343a; } '
+                     'QPushButton:hover { background-color: #3b4149; } '
+                     'QPushButton:disabled { color: #8d939b; background-color: #25282d; } '
+                     'QListWidget::item { padding: 9px 6px; } '
+                     'QListWidget::item:selected { background-color: #365472; } '
+                     'QHeaderView::section { background-color: #30343a; border: 0px; '
+                     'border-bottom: 1px solid #454950; padding: 4px; } '
+                     'QTabBar::tab { background-color: #25282d; padding: 5px 10px; } '
+                     'QTabBar::tab:selected { background-color: #365472; } '
+                     'QComboBox { background-color: #30343a; border: 1px solid #454950; '
+                     'border-radius: 0px; padding: 2px 4px; min-height: 20px; } '
+                     'QComboBox::drop-down { background-color: #30343a; border-left: 1px solid #454950; } '
+                     'QSpinBox::up-button, QSpinBox::down-button, QDoubleSpinBox::up-button, '
+                     'QDoubleSpinBox::down-button { background-color: #30343a; border: 0px; }')
 
 
 def main():
+    if '--self-test' in sys.argv:
+        import os
+        os.environ.setdefault('QT_QPA_PLATFORM', 'offscreen')
     app = QApplication(sys.argv)
     app.setApplicationName('Cybersecurity Fundamentals Toolkit')
     configure_theme(app)
     window = MainWindow()
+    if '--self-test' in sys.argv:
+        if not window.entries or any(entry.spec is None for entry in window.entries):
+            return 2
+        for row in range(1, len(window.entries) + 1):
+            window.select_module(row)
+            if isinstance(window.stack.currentWidget(), QPlainTextEdit):
+                return 3
+        if not window.context.resource_text('common_passwords.txt'):
+            return 4
+        window.close()
+        return 0
     window.show()
     return app.exec()

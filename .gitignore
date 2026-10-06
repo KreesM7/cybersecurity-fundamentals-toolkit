@@ -10,3 +10,4 @@ dist/
 .coverage
 native/
 *.log
+!examples/*.log

@@ -1,0 +1,5 @@
+timestamp,source_ip,bytes,protocol
+2026-10-06T00:00:02Z,10.0.0.8,64,TCP
+bad-timestamp,10.0.0.8,64,TCP
+2026-10-06T00:00:01+00:00,10.0.0.9,128,UDP
+2026-10-06T00:00:03Z,not-an-ip,64,TCP

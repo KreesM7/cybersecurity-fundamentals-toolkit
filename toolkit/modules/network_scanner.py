@@ -4,6 +4,7 @@ from pathlib import Path
 import os
 import shutil
 import socket
+import subprocess
 
 from toolkit.core import ModuleSpec
 from toolkit.security import is_private_v4, validate_subnet
@@ -87,16 +88,31 @@ def scan_subnet(subnet, interface, task=None):
     network = validate_subnet(subnet, interface.ip, interface.netmask)
     task.check()
     import nmap
-    scanner = nmap.PortScanner(nmap_search_path=(nmap_path(),))
+    executable = nmap_path()
+    # Use python-nmap's XML analysis API without its constructor/scan subprocesses,
+    # which open console windows on Windows and do not bound version discovery.
+    scanner = nmap.PortScanner.__new__(nmap.PortScanner)
     addresses = list(network.hosts())
     results = []
     # One host at a time makes cancellation bounded without killing unrelated processes.
     for index, address in enumerate(addresses):
         task.check()
+        if interface not in list_interfaces():
+            raise ValueError('Selected interface changed during the scan; results were discarded.')
         task.report(f'Scanning {address} ({index + 1}/{len(addresses)})')
-        reply = scanner.scan(str(address), COMMON_PORTS,
-                             arguments='-sT -Pn -n --max-retries 1 --host-timeout 5s --max-rate 100',
-                             timeout=8)
+        args = [executable, '-oX', '-', str(address), '-p', COMMON_PORTS,
+                '-sT', '-Pn', '-n', '--max-retries', '1', '--host-timeout', '5s', '--max-rate', '100']
+        try:
+            process = subprocess.run(args, stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                                     stderr=subprocess.PIPE, timeout=8, shell=False,
+                                     creationflags=getattr(subprocess, 'CREATE_NO_WINDOW', 0))
+        except subprocess.TimeoutExpired:
+            results.append(HostResult(str(address), 'Inconclusive: timeout', []))
+            continue
+        if process.returncode:
+            raise RuntimeError('Nmap failed: ' + process.stderr.decode('utf-8', errors='replace')[:1000])
+        task.check()
+        reply = scanner.analyse_nmap_xml_scan(process.stdout)
         results.append(interpret_host(str(address), reply))
     task.check()
     return results

@@ -21,6 +21,7 @@ class AnomalyReport:
     anomalies: list[Anomaly]
     sufficient: bool
     examined: int
+    total: int = 0
 
 
 def _score(value, history):
@@ -42,11 +43,14 @@ def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=
     task = task or TaskContext()
     if not events:
         return AnomalyReport([], False, 0)
-    bins = {}
+    bins, protocol_names = {}, set()
     for index, event in enumerate(events):
         if index % 1000 == 0:
             task.check()
         bucket = math.floor(event.timestamp / bin_seconds)
+        protocol_names.add(event.protocol)
+        if len(protocol_names) > 64:
+            raise ValueError('More than 64 protocol labels. Group uncommon protocols before analysis.')
         size, protocols = bins.setdefault(bucket, [0, Counter()])
         bins[bucket][0] = size + event.bytes
         protocols[event.protocol] += 1
@@ -54,7 +58,7 @@ def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=
     if last - first + 1 > 100000:
         raise ValueError('Time span exceeds 100,000 bins. Increase bin size or split the file.')
     history = deque(maxlen=baseline_bins)
-    findings, examined = [], 0
+    findings, examined, total_findings = [], 0, 0
     for bucket in range(first, last + 1):
         task.check()
         size, counts = bins.get(bucket, (0, Counter()))
@@ -62,18 +66,24 @@ def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=
         proportions = {protocol: count / total for protocol, count in counts.items()} if total else {}
         if len(history) == baseline_bins:
             examined += 1
-            metrics = {'Bytes': (size, [item[0] for item in history]),
-                       'Events': (total, [item[1] for item in history])}
             protocols = set(proportions).union(*(item[2] for item in history))
-            for protocol in sorted(protocols):
-                metrics['Protocol ' + protocol] = (proportions.get(protocol, 0),
-                                                   [item[2].get(protocol, 0) for item in history])
-            for metric, (value, previous) in metrics.items():
+
+            def metrics():
+                yield 'Bytes', size, [item[0] for item in history]
+                yield 'Events', total, [item[1] for item in history]
+                for protocol in sorted(protocols):
+                    task.check()
+                    yield 'Protocol ' + protocol, proportions.get(protocol, 0), [item[2].get(protocol, 0) for item in history]
+
+            for metric, value, previous in metrics():
+                task.check()
                 mean, zscore = _score(value, previous)
                 if abs(zscore) > threshold:
-                    findings.append(Anomaly(bucket * bin_seconds, metric, value, mean, zscore))
+                    total_findings += 1
+                    if len(findings) < 5000:
+                        findings.append(Anomaly(bucket * bin_seconds, metric, value, mean, zscore))
         history.append((size, total, proportions))
-    return AnomalyReport(findings, examined > 0, examined)
+    return AnomalyReport(findings, examined > 0, examined, total_findings)
 
 
 def readiness():
@@ -125,7 +135,7 @@ def create_panel(context):
             data, report = result
             fill_table(results, ((utc_label(a.bin_start), a.metric, f'{a.value:.4g}', f'{a.baseline:.4g}',
                                   f'{a.zscore:.3g}') for a in report.anomalies))
-            state = f'{len(report.anomalies):,} anomalies in {report.examined:,} evaluated bins; showing at most 5,000.'
+            state = f'{report.total:,} anomalies in {report.examined:,} evaluated bins; retained/displayed at most 5,000.'
             if not report.sufficient:
                 state = f'Insufficient baseline data: need at least {options[1] + 1} bins.'
             panel.status.setText(input_summary(data) + '\n' + state)

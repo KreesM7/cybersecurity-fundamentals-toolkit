@@ -1,6 +1,9 @@
 from dataclasses import dataclass
 from difflib import SequenceMatcher
-from threading import Lock
+import hashlib
+import math
+import socket
+from threading import Event, Lock, Thread
 from urllib.parse import quote, urlencode
 import re
 import time
@@ -19,6 +22,7 @@ SQL_ERRORS = {
 }
 _request_gate = Lock()
 _next_request_at = 0.0
+REQUEST_SECONDS = 15
 
 
 @dataclass
@@ -84,34 +88,80 @@ class LimitedClient:
                                               assert_hostname=target.host, cert_reqs='CERT_REQUIRED')
         else:
             pool = urllib3.HTTPConnectionPool(**options)
+        connection = [None]
+        deadline = time.monotonic() + REQUEST_SECONDS
+        finished, expired = Event(), Event()
+        connection_base = pool.ConnectionCls
+
+        class TrackedConnection(connection_base):
+            def connect(self):
+                super().connect()
+                connection[0] = self
+                if client_task.event.is_set() or expired.is_set():
+                    self.close()
+                    client_task.check()
+                    raise ValueError('Whole-request time limit exceeded.')
+
+        client_task = self.task
+        pool.ConnectionCls = TrackedConnection
+
+        def guard():
+            while not finished.wait(0.05):
+                cancelled = client_task.event.is_set()
+                if cancelled or time.monotonic() >= deadline:
+                    if not cancelled:
+                        expired.set()
+                    active = connection[0]
+                    if active is not None and active.sock is not None:
+                        try:
+                            active.sock.shutdown(socket.SHUT_RDWR)
+                        except OSError:
+                            pass
+                        active.close()
+                    return
+
+        watchdog = Thread(target=guard, daemon=True, name='local-http-deadline')
         headers = {'Host': target.authority, 'Accept-Encoding': 'identity',
                    'User-Agent': 'CybersecurityFundamentalsToolkit/0.1'}
         if method == 'POST':
             headers['Content-Type'] = 'application/x-www-form-urlencoded'
         response = None
+        watchdog.start()
         try:
             response = pool.urlopen(method, path, body=encoded.encode('utf-8') if method == 'POST' else None,
                                     headers=headers, redirect=False, retries=False,
                                     preload_content=False, assert_same_host=False)
+            self.task.check()
             if 300 <= response.status < 400:
                 raise ValueError('Redirect blocked. Enter the final local URL directly.')
             if response.headers.get('Content-Encoding', 'identity').lower() not in ('identity', ''):
                 raise ValueError('Compressed responses are unsupported; the server must honor Accept-Encoding: identity.')
             chunks, total = [], 0
-            deadline = time.monotonic() + 10
+            body_deadline = min(deadline, time.monotonic() + 10)
             while True:
                 self.task.check()
-                if time.monotonic() > deadline:
+                if expired.is_set() or time.monotonic() > body_deadline:
                     raise ValueError('Response exceeded the 10-second body-read limit.')
-                chunk = response.read(16384, decode_content=False)
+                # read1 returns available data instead of waiting to fill 16 KiB.
+                # The watchdog also interrupts slow headers and socket cancellation.
+                chunk = response.read1(16384, decode_content=False)
                 if not chunk:
                     break
                 total += len(chunk)
                 if total > 1048576:
                     raise ValueError('Response is too large (1 MiB limit); it was not analyzed.')
                 chunks.append(chunk)
+            if expired.is_set():
+                raise ValueError('Whole-request time limit exceeded.')
             return Response(response.status, b''.join(chunks).decode('utf-8', errors='replace'))
+        except Exception as exc:
+            self.task.check()
+            if expired.is_set():
+                raise ValueError('Whole-request time limit exceeded.') from exc
+            raise
         finally:
+            finished.set()
+            watchdog.join(timeout=0.2)
             if response is not None:
                 response.close()
             pool.close()
@@ -172,6 +222,18 @@ def _normalize(text, values):
     return ' '.join(text.split())
 
 
+def content_similarity(first, second):
+    if first == second:
+        return 1.0
+    # Bound the matcher's input to 1,024 fingerprints over the entire response.
+    # Comparing raw repetitive pages can otherwise require quadratic CPU time.
+    width = max(1, math.ceil(max(len(first), len(second)) / 1024))
+    def fingerprints(text):
+        return [hashlib.blake2s(text[index:index + width].encode('utf-8'), digest_size=8).digest()
+                for index in range(0, len(text), width)]
+    return SequenceMatcher(None, fingerprints(first), fingerprints(second)).ratio()
+
+
 def test_form(source_url, form, fields, owned=False, allow_post=False, task=None):
     if not owned:
         raise ValueError('Confirm that you own this test application before sending probes.')
@@ -193,7 +255,7 @@ def test_form(source_url, form, fields, owned=False, allow_post=False, task=None
     second = client.request(target.url, form.method, fields)
     values = [value for _, value in fields]
     a, b = _normalize(first.text, values), _normalize(second.text, values)
-    if first.status != second.status or SequenceMatcher(None, a, b).ratio() < 0.98:
+    if first.status != second.status or content_similarity(a, b) < 0.98:
         raise ValueError('Baseline responses differ. Anomaly comparison would be unreliable; testing stopped.')
     baseline_errors = _errors(first.text) | _errors(second.text)
     findings = []
@@ -212,7 +274,7 @@ def test_form(source_url, form, fields, owned=False, allow_post=False, task=None
                 evidence.append('New SQL error signature: ' + ', '.join(sorted(new_errors)))
             if reply.status != first.status:
                 evidence.append(f'HTTP status changed from {first.status} to {reply.status}')
-            if SequenceMatcher(None, a, normal).ratio() < 0.8:
+            if content_similarity(a, normal) < 0.8:
                 evidence.append('Response content changed substantially')
             if evidence:
                 findings.append(Finding(name, probe, reply.status, '; '.join(evidence)))

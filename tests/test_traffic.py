@@ -83,6 +83,18 @@ class TrafficTests(unittest.TestCase):
         self.assertTrue(any(a.metric == 'Protocol UDP' for a in report.anomalies))
         self.assertFalse(module.detect_anomalies(events[:5]).sufficient)
 
+    def test_protocol_cardinality_and_result_storage_are_bounded(self):
+        reader = self.reader()
+        module = importlib.import_module('toolkit.modules.anomaly_detector')
+        events = [reader.TrafficEvent(i % 3, '10.0.0.1', 1, f'P{i}') for i in range(1000)]
+        with self.assertRaisesRegex(ValueError, 'protocol'):
+            module.detect_anomalies(events, baseline_bins=2)
+        # Alternating volume triggers enough anomalies to exceed the display limit.
+        events = [reader.TrafficEvent(i, '10.0.0.1', i % 2, 'TCP') for i in range(5200)]
+        report = module.detect_anomalies(events, baseline_bins=2, threshold=0.1)
+        self.assertGreater(report.total, 5000)
+        self.assertEqual(len(report.anomalies), 5000)
+
 
 if __name__ == '__main__':
     unittest.main()

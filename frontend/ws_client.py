@@ -5,8 +5,25 @@ from collections.abc import AsyncIterator
 from urllib.parse import urlsplit
 
 from websockets.asyncio.client import connect
+from websockets.exceptions import InvalidStatus
 
 from frontend.api_client import validate_connection
+
+
+class WebSocketRedirectError(RuntimeError):
+    """A local backend attempted to move its authenticated websocket connection."""
+
+
+class _NoRedirectConnect(connect):
+    """Refuse redirect responses at the hook before websockets opens another connection."""
+
+    def process_redirect(self, exc: Exception) -> Exception:
+        if isinstance(exc, InvalidStatus) and 300 <= exc.response.status_code < 400:
+            return WebSocketRedirectError(
+                "Backend websocket redirects are refused. "
+                "Reconnect using the authenticated instance locator."
+            )
+        return exc
 
 
 class WebSocketClient:
@@ -22,7 +39,7 @@ class WebSocketClient:
         """Yield bounded messages until disconnect, with no automatic retry."""
         if not path.startswith("/api/v1/") or urlsplit(path).netloc or "\\" in path:
             raise ValueError("Expected a local /api/v1/ stream")
-        async with connect(
+        async with _NoRedirectConnect(
             self._base_url + path,
             ssl=self._context,
             additional_headers={"Authorization": f"Bearer {self._token}"},

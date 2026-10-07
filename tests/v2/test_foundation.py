@@ -204,6 +204,62 @@ async def test_wss_client_uses_trusted_context_bearer_and_ignores_proxy(
             vm.close()
 
 
+@pytest.mark.parametrize("status", [300, 301, 302, 303, 307, 308])
+@pytest.mark.parametrize("location", ["wss://example.invalid/api/v1/events", "/api/v1/other"])
+async def test_wss_redirects_fail_before_any_second_connection(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch, status: int, location: str
+) -> None:
+    from http import HTTPStatus
+    from typing import Any
+
+    from websockets.asyncio.server import ServerConnection, serve
+    from websockets.http11 import Request, Response
+
+    from backend.tls import ensure_tls
+    from frontend.ws_client import WebSocketClient, WebSocketRedirectError
+
+    material = ensure_tls(tmp_path)
+    server_context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    server_context.load_cert_chain(material.server_cert, material.server_key)
+    handshakes: list[str | None] = []
+
+    def redirect(connection: ServerConnection, request: Request) -> Response:
+        handshakes.append(request.headers.get("Authorization"))
+        response = connection.respond(HTTPStatus(status), "Backend redirect")
+        response.headers["Location"] = location
+        return response
+
+    async def handler(connection: ServerConnection) -> None:
+        raise AssertionError("A redirect must never complete a websocket handshake")
+
+    async with serve(
+        handler, "127.0.0.1", 0, ssl=server_context, process_request=redirect
+    ) as server:
+        port = server.sockets[0].getsockname()[1]
+        attempted: list[tuple[object, object]] = []
+        loop = asyncio.get_running_loop()
+        create_connection = loop.create_connection
+
+        async def guarded_connection(*args: Any, **kwargs: Any) -> Any:
+            # Preserve the real local TLS handshake, intercepting only further network attempts.
+            host = kwargs.get("host", args[1] if len(args) > 1 else None)
+            attempted.append((host, kwargs.get("port", args[2] if len(args) > 2 else None)))
+            if len(attempted) > 1:
+                raise RuntimeError("Unexpected second connection attempt")
+            return await create_connection(*args, **kwargs)
+
+        monkeypatch.setattr(loop, "create_connection", guarded_connection)
+        client = WebSocketClient(f"https://127.0.0.1:{port}", material.client_context(), TOKEN)
+        with pytest.raises(WebSocketRedirectError) as failure:
+            async for _ in client.messages("/api/v1/events"):
+                raise AssertionError("Redirect must not produce stream messages")
+        assert attempted == [("127.0.0.1", port)]
+        assert handshakes == [f"Bearer {TOKEN}"]
+        assert "redirect" in str(failure.value).lower()
+        assert "instance locator" in str(failure.value).lower()
+        assert TOKEN not in str(failure.value) and "example.invalid" not in str(failure.value)
+
+
 def test_theme_loads_outside_repository(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
     from frontend.theme import load_theme
 

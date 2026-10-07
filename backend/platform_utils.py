@@ -147,7 +147,8 @@ def _protect_windows(path: Path) -> None:
     security.SetFileSecurityW.argtypes = [wintypes.LPCWSTR, wintypes.DWORD, ctypes.c_void_p]
     kernel.LocalFree.argtypes = [ctypes.c_void_p]
     descriptor = ctypes.c_void_p()
-    sddl = f"D:P(A;;FA;;;{_windows_sid()})"
+    flags = "OICI" if path.is_dir() else ""
+    sddl = f"D:P(A;{flags};FA;;;{_windows_sid()})"
     if not security.ConvertStringSecurityDescriptorToSecurityDescriptorW(
         sddl, 1, ctypes.byref(descriptor), None
     ):
@@ -266,6 +267,29 @@ def atomic_private_write(path: Path, data: bytes) -> None:
         if descriptor != -1:
             os.close(descriptor)
         temporary.unlink(missing_ok=True)
+
+
+def remove_private_tree(path: Path, root: Path) -> None:
+    """Delete exactly one private child of the intended root, never a link or reparse tree."""
+    _reject_links(root)
+    _reject_links(path)
+    resolved_root = root.resolve(strict=True)
+    resolved_target = path.resolve(strict=True)
+    if resolved_target.parent != resolved_root or not resolved_target.is_dir():
+        raise ValueError("Deletion target must be a direct directory child of the workspace root.")
+    assert_private_path(resolved_root)
+    pending = [resolved_target]
+    while pending:
+        current = pending.pop()
+        _reject_links(current)
+        assert_private_path(current)
+        if current.is_dir():
+            pending.extend(current.iterdir())
+    # Recheck resolved containment immediately before the recursive operation.
+    _reject_links(resolved_target)
+    if resolved_target.resolve(strict=True).parent != resolved_root:
+        raise ValueError("Deletion target changed during validation.")
+    shutil.rmtree(resolved_target)
 
 
 class ProfileInUseError(RuntimeError):

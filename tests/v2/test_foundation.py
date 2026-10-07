@@ -16,24 +16,24 @@ TOKEN = "a" * 64
 API_URL = "https://127.0.0.1:12345"
 
 
-async def test_health_returns_instance_and_hides_public_docs(tmp_path: Path) -> None:
+async def test_health_returns_instance_and_protects_docs(tmp_path: Path) -> None:
     import httpx
 
     from backend.main import create_app
 
-    app = create_app("token", "test-instance", tmp_path)
+    app = create_app(TOKEN, "test-instance", tmp_path)
     async with httpx.AsyncClient(
         transport=httpx.ASGITransport(app=app), base_url="https://localhost"
     ) as client:
-        response = await client.get("/api/v1/health")
+        response = await client.get("/api/v1/health", headers={"Authorization": f"Bearer {TOKEN}"})
         assert response.json() == {
             "schema_version": 1,
             "version": "2.0.0",
             "instance_id": "test-instance",
             "status": "ready",
         }
-        assert (await client.get("/docs")).status_code == 404
-        assert (await client.get("/openapi.json")).status_code == 404
+        assert (await client.get("/docs")).status_code == 401
+        assert (await client.get("/openapi.json")).status_code == 401
     assert app.state.profile == tmp_path
 
 
@@ -69,7 +69,7 @@ async def test_api_client_requires_tls_and_handles_typed_health(tmp_path: Path) 
     insecure = ssl._create_unverified_context()
     with pytest.raises(ValueError, match="verif"):
         ApiClient(API_URL, insecure, TOKEN)
-    transport = httpx.ASGITransport(app=create_app("token", "known", tmp_path))
+    transport = httpx.ASGITransport(app=create_app(TOKEN, "known", tmp_path))
     async with ApiClient(API_URL, context, TOKEN, transport=transport) as client:
         assert (await client.health()).instance_id == "known"
 

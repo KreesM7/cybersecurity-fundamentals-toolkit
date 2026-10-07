@@ -37,8 +37,14 @@ class WebSocketClient:
 
     async def messages(self, path: str) -> AsyncIterator[str | bytes]:
         """Yield bounded messages until disconnect, with no automatic retry."""
-        if not path.startswith("/api/v1/") or urlsplit(path).netloc or "\\" in path:
-            raise ValueError("Expected a local /api/v1/ stream")
+        if (
+            not path.startswith(("/api/v1/", "/ws/"))
+            or urlsplit(path).netloc
+            or "\\" in path
+            or "#" in path
+            or "/../" in path
+        ):
+            raise ValueError("Expected a local /ws/ stream")
         async with _NoRedirectConnect(
             self._base_url + path,
             ssl=self._context,

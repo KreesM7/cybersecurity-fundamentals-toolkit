@@ -154,7 +154,6 @@ class BackendInstance:
 
 def prepare_backend(profile: Path, *, lease: ProfileLease | None = None) -> BackendInstance:
     """Prepare TLS and reserve the socket before making a new locator discoverable."""
-    from backend.auth import install_auth
     from backend.main import create_app
 
     profile.mkdir(parents=True, exist_ok=True)
@@ -168,9 +167,11 @@ def prepare_backend(profile: Path, *, lease: ProfileLease | None = None) -> Back
         port = int(listener.getsockname()[1])
         locator = InstanceLocator.fresh(port, secrets.token_hex(32), tls.fingerprint)
         token = locator.token.get_secret_value()
-        app = create_app(token, str(locator.instance_id), profile)
-        install_auth(
-            app, token, allowed_origins={f"https://127.0.0.1:{port}", f"https://localhost:{port}"}
+        app = create_app(
+            token,
+            str(locator.instance_id),
+            profile,
+            allowed_origins={f"https://127.0.0.1:{port}", f"https://localhost:{port}"},
         )
         server = uvicorn.Server(
             uvicorn.Config(

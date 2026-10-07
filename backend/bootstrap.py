@@ -84,8 +84,13 @@ async def verify_existing(profile: Path, locator: InstanceLocator) -> bool:
     tls_path = profile / "tls"
     cert_path = tls_path / "server.pem"
     ca_path = tls_path / "ca.pem"
-    assert_private_path(cert_path)
-    assert_private_path(ca_path)
+    try:
+        assert_private_path(cert_path)
+        assert_private_path(ca_path)
+    except FileNotFoundError:
+        # Recovery still requires the exclusive profile lease in prepare_backend.
+        # A running owner prevents replacement even if its on-disk certificates disappeared.
+        return False
     certificate = x509.load_pem_x509_certificate(cert_path.read_bytes())
     fingerprint = certificate.fingerprint(hashes.SHA256()).hex()
     if not secrets.compare_digest(fingerprint, locator.certificate_fingerprint):

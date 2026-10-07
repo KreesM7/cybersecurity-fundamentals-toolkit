@@ -14,6 +14,7 @@ from backend.bootstrap import (
     verify_existing,
     wait_ready,
 )
+from backend.platform_utils import ProfileInUseError, acquire_profile_lease
 from backend.tls import TLSMaterial
 
 
@@ -42,8 +43,17 @@ class BackendThread(QThread):
 
     async def _serve(self) -> None:
         self._loop = asyncio.get_running_loop()
-        existing = read_locator(self.profile)
-        if existing is not None and await verify_existing(self.profile, existing):
+        if self._stop_requested:
+            return
+        try:
+            lease = acquire_profile_lease(self.profile)
+        except ProfileInUseError:
+            # A live owner's locator and trust must be verified, never repaired or superseded.
+            existing = read_locator(self.profile)
+            if existing is None or not await verify_existing(self.profile, existing):
+                raise ProfileInUseError(
+                    "A live backend owns this profile but cannot be authenticated."
+                ) from None
             tls_path = self.profile / "tls"
             material = TLSMaterial(
                 tls_path / "ca.pem",
@@ -55,8 +65,10 @@ class BackendThread(QThread):
                 self.ready.emit(existing, material, False)
             return
         if self._stop_requested:
+            lease.close()
             return
-        self.instance = prepare_backend(self.profile)
+        # Exclusive ownership permits replacement of stale locator and damaged/expired trust.
+        self.instance = prepare_backend(self.profile, lease=lease)
         server = asyncio.create_task(self.instance.serve())
         try:
             await wait_ready(self.instance.locator, self.instance.tls)

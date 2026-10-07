@@ -152,14 +152,14 @@ class BackendInstance:
         self.server.should_exit = True
 
 
-def prepare_backend(profile: Path) -> BackendInstance:
+def prepare_backend(profile: Path, *, lease: ProfileLease | None = None) -> BackendInstance:
     """Prepare TLS and reserve the socket before making a new locator discoverable."""
     from backend.auth import install_auth
     from backend.main import create_app
 
     profile.mkdir(parents=True, exist_ok=True)
     protect_private_path(profile, directory=True)
-    lease = acquire_profile_lease(profile)
+    lease = lease or acquire_profile_lease(profile)
     listener = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
     try:
         tls = ensure_tls(profile)

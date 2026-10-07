@@ -13,6 +13,47 @@ from frontend.viewmodels.base_vm import BaseViewModel
 
 
 class QtBootstrapTests(unittest.TestCase):
+    def test_stale_corrupt_tls_is_repaired_but_live_owner_is_never_overwritten(self) -> None:
+        app = QApplication.instance() or QApplication([])
+        for live_owner in (False, True):
+            with self.subTest(live_owner=live_owner), tempfile.TemporaryDirectory() as directory:
+                profile = Path(directory)
+                stale = prepare_backend(profile)
+                stale.listener.close()
+                if not live_owner:
+                    stale.lease.close()
+                stale.tls.server_cert.write_bytes(b"corrupt TLS material")
+                thread = BackendThread(profile)
+                received: list[tuple[object, object, bool]] = []
+                failures: list[str] = []
+                thread.ready.connect(
+                    lambda locator, tls, owned: received.append((locator, tls, owned))
+                )
+                thread.failed.connect(failures.append)
+                thread.start()
+                try:
+                    deadline = time.monotonic() + 15
+                    while not received and not failures and time.monotonic() < deadline:
+                        app.processEvents()
+                        time.sleep(0.01)
+                    if live_owner:
+                        self.assertTrue(failures)
+                        self.assertFalse(received)
+                        self.assertIsNone(thread.instance)
+                        self.assertEqual(
+                            stale.tls.server_cert.read_bytes(), b"corrupt TLS material"
+                        )
+                    else:
+                        self.assertFalse(failures, failures)
+                        self.assertTrue(received)
+                        self.assertNotEqual(
+                            stale.tls.server_cert.read_bytes(), b"corrupt TLS material"
+                        )
+                finally:
+                    thread.stop()
+                    self.assertTrue(thread.wait(12000))
+                    stale.lease.close()
+
     def test_stale_unclean_locator_with_missing_certificate_is_repaired(self) -> None:
         app = QApplication.instance() or QApplication([])
         with tempfile.TemporaryDirectory() as directory:

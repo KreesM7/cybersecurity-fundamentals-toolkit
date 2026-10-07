@@ -87,6 +87,13 @@ def create_app(
         version="2.0.0",
         lifespan=lifespan,
         redoc_url=None,
+        telemetry={
+            "tracing": False,
+            "metrics": False,
+            "logs": False,
+            "operation_spans": False,
+            "auto_configure": False,
+        },
     )
     app.state.profile = profile
     app.state.instance_id = instance_id
@@ -241,18 +248,32 @@ def create_app(
 
         sender = asyncio.create_task(send_events())
         receiver = asyncio.create_task(detect_disconnect())
+        closed = asyncio.create_task(subscription.closed.wait())
+        tasks = (sender, receiver, closed)
         try:
-            done, _ = await asyncio.wait((sender, receiver), return_when=asyncio.FIRST_COMPLETED)
+            done, _ = await asyncio.wait(tasks, return_when=asyncio.FIRST_COMPLETED)
+            if closed in done:
+                raise SlowConsumerError("Reload REST state before reconnecting.")
             for task in done:
                 task.result()
         except SlowConsumerError:
-            await websocket.close(code=1013, reason="Reload REST state before reconnecting.")
+            # A blocked transport write must not prevent the overflow signal from closing us.
+            sender.cancel()
+            receiver.cancel()
+            await asyncio.gather(sender, receiver, return_exceptions=True)
+            try:
+                async with asyncio.timeout(1):
+                    await websocket.close(
+                        code=1013, reason="Reload REST state before reconnecting."
+                    )
+            except (TimeoutError, WebSocketDisconnect, RuntimeError):
+                pass
         except (WebSocketDisconnect, RuntimeError):
             pass
         finally:
             hub.unsubscribe(subscription)
-            sender.cancel()
-            receiver.cancel()
-            await asyncio.gather(sender, receiver, return_exceptions=True)
+            for task in tasks:
+                task.cancel()
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     return app

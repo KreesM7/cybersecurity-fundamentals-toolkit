@@ -1,13 +1,38 @@
 from __future__ import annotations
 
 import unittest
+from threading import Event
 from uuid import uuid4
 
 from backend.events import EventHub
+from backend.jobs import JobContext
 from backend.redaction import Redactor
 
 
 class RedactionTests(unittest.IsolatedAsyncioTestCase):
+    async def test_job_progress_redacts_before_its_shorter_limit(self) -> None:
+        hub = EventHub()
+        hub.redactor.register("boundary-secret")
+        context = JobContext(Event(), hub, uuid4(), uuid4())
+        await context.progress("x" * 994 + "boundary-secret")
+        self.assertEqual(
+            hub.recent[-1].data,
+            {"id": str(context.job_id), "progress": "x" * 994 + "[REDAC"},
+        )
+        await hub.close()
+
+    async def test_registered_secrets_are_removed_before_truncation_and_retention(self) -> None:
+        for prefix, secret in (("x" * 9994, "boundary-secret"), ("", "z" * 65536)):
+            with self.subTest(secret_length=len(secret)):
+                hub = EventHub()
+                hub.redactor.register(secret)
+                subscriber = hub.subscribe("console")
+                await hub.publish("console", {"line": prefix + secret + " public"})
+                expected = (prefix + "[REDACTED] public")[:10000]
+                self.assertEqual((await subscriber.receive()).data, {"line": expected})
+                self.assertEqual(hub.recent[-1].data, {"line": expected})
+                await hub.close()
+
     async def test_nested_fields_registered_secrets_and_console_patterns_are_redacted(self) -> None:
         redactor = Redactor()
         redactor.register("sentinel-rpc-secret")

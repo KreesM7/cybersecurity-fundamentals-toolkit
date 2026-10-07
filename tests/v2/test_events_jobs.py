@@ -2,13 +2,95 @@ from __future__ import annotations
 
 import asyncio
 import unittest
+from threading import Event
 from uuid import uuid4
 
 from backend.events import EventHub, SlowConsumerError
-from backend.jobs import JobManager, JobQueueFullError
+from backend.jobs import JobContext, JobManager, JobQueueFullError
 
 
 class EventJobTests(unittest.IsolatedAsyncioTestCase):
+    async def test_shutdown_cancellation_cannot_interrupt_lease_cleanup(self) -> None:
+        manager = JobManager(EventHub())
+        cleanup_started, cleanup_gate = asyncio.Event(), asyncio.Event()
+        released = False
+
+        async def work(context: JobContext) -> None:
+            return None
+
+        async def cleanup() -> None:
+            nonlocal released
+            cleanup_started.set()
+            await cleanup_gate.wait()
+            released = True
+
+        job = await manager.submit("fixture", uuid4(), work, cleanup=cleanup)
+        await asyncio.wait_for(cleanup_started.wait(), 2)
+        shutdown = asyncio.create_task(manager.close())
+        try:
+            await asyncio.sleep(0)
+            shutdown.cancel()
+            await asyncio.sleep(0)
+            shutdown.cancel()
+            done, _ = await asyncio.wait((shutdown,), timeout=0.05)
+            self.assertFalse(done, "Shutdown returned before workspace cleanup completed")
+            self.assertFalse(released)
+            self.assertEqual(manager.active_count, 1)
+        finally:
+            cleanup_gate.set()
+            await asyncio.gather(shutdown, return_exceptions=True)
+            await manager.wait_idle()
+        self.assertTrue(released)
+        self.assertEqual(manager.get(job.id, job.workspace_id).status, "succeeded")
+
+    async def test_concurrent_cancel_clear_shutdown_wait_for_native_worker(self) -> None:
+        manager = JobManager(EventHub())
+        loop = asyncio.get_running_loop()
+        started, cancellation_seen = asyncio.Event(), asyncio.Event()
+        worker_gate, worker_exited = Event(), Event()
+        releases: list[bool] = []
+
+        async def work(context: JobContext) -> None:
+            def native_work() -> None:
+                loop.call_soon_threadsafe(started.set)
+                context.cancel_event.wait(5)
+                loop.call_soon_threadsafe(cancellation_seen.set)
+                worker_gate.wait(5)
+                worker_exited.set()
+
+            await context.run_sync(native_work)
+
+        async def cleanup() -> None:
+            releases.append(worker_exited.is_set())
+
+        job = await manager.submit("fixture", uuid4(), work, cleanup=cleanup)
+        await asyncio.wait_for(started.wait(), 2)
+        calls = [asyncio.create_task(manager.cancel(job.id, job.workspace_id))]
+        try:
+            await asyncio.wait_for(cancellation_seen.wait(), 2)
+            calls.extend(
+                asyncio.create_task(action)
+                for action in (
+                    manager.cancel(job.id, job.workspace_id),
+                    manager.clear(job.id, job.workspace_id),
+                    manager.clear(job.id, job.workspace_id),
+                    manager.close(),
+                )
+            )
+            # A bounded wait leaves the native worker gated while all callers run.
+            done, _ = await asyncio.wait(calls, timeout=0.05)
+            self.assertEqual(releases, [], "Lease released before native worker exit")
+            self.assertFalse(done, "Cancellation returned while its worker was still active")
+            self.assertEqual(manager.active_count, 1)
+        finally:
+            worker_gate.set()
+            results = await asyncio.gather(*calls, return_exceptions=True)
+            await manager.close()
+        self.assertEqual(releases, [True])
+        self.assertEqual(results, [None] * len(calls))
+        self.assertEqual(manager.active_count, 0)
+        self.assertNotIn(job.id, manager.records)
+
     async def test_slow_consumer_disconnects_without_blocking_other_subscribers(self) -> None:
         hub = EventHub(queue_size=2)
         workspace = uuid4()

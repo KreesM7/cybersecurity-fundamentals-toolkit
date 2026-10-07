@@ -1,15 +1,95 @@
 """Application lifecycle, authenticated persistence and bounded event channels."""
 
+import asyncio
 from pathlib import Path
 from uuid import uuid4
 
 import httpx
 import pytest
 
+from backend.events import EventHub
 from backend.main import create_app
 
 TOKEN = "b" * 64
 AUTH = {"Authorization": f"Bearer {TOKEN}"}
+
+
+def test_factory_disables_native_telemetry_before_processing_requests(tmp_path: Path) -> None:
+    app = create_app(TOKEN, "private-errors", tmp_path)
+    for setting in ("tracing", "metrics", "logs", "operation_spans", "auto_configure"):
+        assert app._telemetry[setting] is False
+    assert not app._native_telemetry.enabled()
+
+
+@pytest.mark.parametrize("stall_close", [False, True])
+async def test_overflow_disconnects_even_while_transport_send_is_stalled(
+    tmp_path: Path, stall_close: bool
+) -> None:
+    app = create_app(TOKEN, "slow-peer", tmp_path)
+    app.state.events = hub = EventHub(queue_size=2)
+    app.state.workspaces = object()
+    accepted, sending, close_attempted = asyncio.Event(), asyncio.Event(), asyncio.Event()
+    send_cancelled, receive_cancelled = asyncio.Event(), asyncio.Event()
+    close_messages: list[dict[str, object]] = []
+    connected = False
+
+    async def receive() -> dict[str, object]:
+        nonlocal connected
+        if not connected:
+            connected = True
+            return {"type": "websocket.connect"}
+        try:
+            await asyncio.Event().wait()
+        finally:
+            receive_cancelled.set()
+        raise AssertionError("unreachable")
+
+    async def send(message: dict[str, object]) -> None:
+        if message["type"] == "websocket.accept":
+            accepted.set()
+        elif message["type"] == "websocket.send":
+            sending.set()
+            try:
+                await asyncio.Event().wait()
+            finally:
+                send_cancelled.set()
+        elif message["type"] == "websocket.close":
+            close_messages.append(message)
+            close_attempted.set()
+            if stall_close:
+                await asyncio.Event().wait()
+
+    # Exercise the actual ASGI WebSocket route and Starlette socket with a gated transport.
+    scope = {
+        "type": "websocket",
+        "path": "/ws/events",
+        "query_string": b"",
+        "headers": [(b"authorization", f"Bearer {TOKEN}".encode())],
+        "scheme": "wss",
+        "server": ("127.0.0.1", 443),
+        "client": ("127.0.0.1", 1),
+        "root_path": "",
+        "subprotocols": [],
+    }
+    prior_tasks = asyncio.all_tasks()
+    connection = asyncio.create_task(app(scope, receive, send))
+    try:
+        await asyncio.wait_for(accepted.wait(), 1)
+        await hub.publish("console", {"line": "first"})
+        await asyncio.wait_for(sending.wait(), 1)
+        for index in range(3):
+            await hub.publish("console", {"line": str(index)})
+        await asyncio.wait_for(close_attempted.wait(), 1)
+        await asyncio.wait_for(asyncio.shield(connection), 2)
+        assert close_messages[0]["code"] == 1013
+        assert "REST" in str(close_messages[0]["reason"])
+        assert send_cancelled.is_set() and receive_cancelled.is_set()
+        assert not hub._subscriptions
+        assert not (asyncio.all_tasks() - prior_tasks)
+    finally:
+        connection.cancel()
+        await asyncio.gather(connection, return_exceptions=True)
+        await hub.close()
 
 
 def test_websocket_uses_bearer_rejects_query_auth_and_streams_redacted_events(

@@ -21,6 +21,16 @@ T = TypeVar("T")
 _json: TypeAdapter[JsonValue] = TypeAdapter(JsonValue)
 
 
+async def _drain(task: asyncio.Task[T]) -> T:
+    """Keep owned work alive and wait through repeated cancellation requests."""
+    while not task.done():
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            continue
+    return task.result()
+
+
 class JobQueueFullError(RuntimeError):
     """Submission would exceed the advertised bounded analysis capacity."""
 
@@ -54,7 +64,7 @@ class JobContext:
         self.check()
         await self.hub.publish(
             "jobs",
-            {"id": str(self.job_id), "progress": message[:1000]},
+            {"id": str(self.job_id), "progress": self.hub.redactor.text(message)[:1000]},
             workspace_id=self.workspace_id,
         )
 
@@ -68,7 +78,10 @@ class JobContext:
             return result
         except asyncio.CancelledError:
             self.cancel_event.set()
-            await asyncio.gather(worker, return_exceptions=True)
+            try:
+                await _drain(worker)
+            except Exception:
+                pass  # Cancellation wins over a late native-worker failure.
             raise
 
 
@@ -79,6 +92,8 @@ class JobRecord:
     context: JobContext
     cleanup: Callable[[], Awaitable[None]] | None
     task: asyncio.Task[None] | None = None
+    cancellation_task: asyncio.Task[None] | None = None
+    finish_task: asyncio.Task[None] | None = None
     started: bool = False
     finished: bool = False
 
@@ -113,11 +128,7 @@ class JobManager:
             )
         if len(self.records) >= 1000:
             completed = next(
-                (
-                    key
-                    for key, record in self.records.items()
-                    if record.snapshot.status in ("succeeded", "failed", "cancelled")
-                ),
+                (key for key, record in self.records.items() if record.finished),
                 None,
             )
             if completed is None:
@@ -152,6 +163,7 @@ class JobManager:
     async def _run(self, record: JobRecord) -> None:
         record.started = True
         try:
+            record.context.check()
             work = record.work
             assert work is not None
             record.snapshot.result = _json.validate_python(await work(record.context))
@@ -172,8 +184,12 @@ class JobManager:
             await self._finish(record)
 
     async def _finish(self, record: JobRecord) -> None:
+        if record.finish_task is None:
+            record.finish_task = asyncio.create_task(self._cleanup(record))
+        await _drain(record.finish_task)
+
+    async def _cleanup(self, record: JobRecord) -> None:
         if not record.finished:
-            record.finished = True
             record.work = None
             record.snapshot.updated_at = datetime.now(UTC)
             try:
@@ -188,6 +204,7 @@ class JobManager:
                     "Task cleanup failed. Restart before deleting this workspace."
                 )
             finally:
+                record.finished = True
                 self._active.discard(record.snapshot.id)
                 await self._publish(record)
                 while self._queue and len(self._active) < 2 and not self._closed:
@@ -221,15 +238,25 @@ class JobManager:
         record = self.records[job_id]
         if record.snapshot.workspace_id != workspace_id:
             raise KeyError("Job is not associated with this workspace.")
+        await self._cancel_record(record)
+
+    async def _cancel_record(self, record: JobRecord) -> None:
         record.context.cancel_event.set()
+        if record.cancellation_task is None:
+            record.cancellation_task = asyncio.create_task(self._cancel(record))
+        await _drain(record.cancellation_task)
+
+    async def _cancel(self, record: JobRecord) -> None:
+        job_id = record.snapshot.id
         if job_id in self._queue:
             self._queue.remove(job_id)
             record.snapshot.status = "cancelled"
             record.snapshot.updated_at = datetime.now(UTC)
             await self._finish(record)
         elif record.task is not None and not record.task.done():
-            record.task.cancel()
-            await asyncio.gather(record.task, return_exceptions=True)
+            if record.finish_task is None:
+                record.task.cancel()
+            await asyncio.gather(asyncio.shield(record.task), return_exceptions=True)
             if not record.started:
                 record.snapshot.status = "cancelled"
                 await self._finish(record)
@@ -238,17 +265,20 @@ class JobManager:
         while self._active or self._queue:
             tasks = [self.records[key].task for key in tuple(self._active)]
             await asyncio.gather(
-                *(task for task in tasks if task is not None), return_exceptions=True
+                *(asyncio.shield(task) for task in tasks if task is not None),
+                return_exceptions=True,
             )
 
     async def clear(self, job_id: UUID, workspace_id: UUID) -> None:
+        record = self.records[job_id]
         await self.cancel(job_id, workspace_id)
-        record = self.records.pop(job_id)
+        self.records.pop(job_id, None)
         record.snapshot.result = None
         record.snapshot.progress = ""
         record.snapshot.error = None
 
     async def close(self) -> None:
         self._closed = True
-        for job_id in tuple(self._queue) + tuple(self._active):
-            await self.cancel(job_id, self.records[job_id].snapshot.workspace_id)
+        records = tuple(self.records.values())
+        for record in records:
+            await self._cancel_record(record)

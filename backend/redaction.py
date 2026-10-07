@@ -45,14 +45,14 @@ class Redactor:
             self._secrets[secret] -= 1
 
     def text(self, value: str) -> str:
-        bounded = value[:10000]
+        bounded = value
         for secret in sorted(self._secrets, key=len, reverse=True):
             bounded = bounded.replace(secret, REDACTED)
         bounded = _PRIVATE_KEY.sub(REDACTED, bounded)
         bounded = _NTLM_PAIR.sub(REDACTED, bounded)
         for pattern in (_SET, _ASSIGNMENT, _BEARER):
             bounded = pattern.sub(lambda match: match.group(1) + REDACTED, bounded)
-        return bounded
+        return bounded[:10000]
 
     def clean(self, value: JsonValue) -> JsonValue:
         if isinstance(value, dict):

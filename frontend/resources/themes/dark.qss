@@ -1,0 +1,8 @@
+QWidget { background: #15191e; color: #edf1f5; font-size: 14px; }
+QListWidget { border: 0; border-right: 1px solid #3b4651; padding: 12px; }
+QListWidget::item { padding: 12px 8px; }
+QListWidget::item:selected { background: #263b4f; color: #edf1f5; }
+QListWidget::item:disabled { color: #84909d; }
+QPushButton { border: 1px solid #5fa9f0; padding: 10px 16px; text-align: left; }
+QPushButton:hover { background: #263b4f; }
+QLabel#pageTitle { font-size: 26px; font-weight: 600; padding: 12px 0; }

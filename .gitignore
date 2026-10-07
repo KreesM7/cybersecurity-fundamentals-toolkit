@@ -1,4 +1,12 @@
 __pycache__/
+work/
+.superpowers/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+htmlcov/
+coverage.xml
+*.egg-info/
 *.py[cod]
 .venv/
 build/

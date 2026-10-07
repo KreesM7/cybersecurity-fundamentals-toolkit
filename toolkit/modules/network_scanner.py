@@ -66,7 +66,7 @@ def readiness():
         import nmap
         import psutil
         nmap_path()
-        return '' if list_interfaces() else 'No active RFC1918 IPv4 interface found.'
+        return ''
     except (ImportError, RuntimeError) as exc:
         return 'Setup needed: ' + str(exc)
 
@@ -80,12 +80,14 @@ def interpret_host(ip, response):
     return HostResult(ip, 'Responded' if responded else 'Inconclusive', ports)
 
 
-def scan_subnet(subnet, interface, task=None):
+def scan_subnet(subnet, interface=None, task=None, *, authorized=False):
     from toolkit.tasks import TaskContext
     task = task or TaskContext()
-    if interface not in list_interfaces():
+    if not authorized:
+        raise ValueError('Confirm ownership or permission to scan the target.')
+    if interface is not None and interface not in list_interfaces():
         raise ValueError('Selected interface changed or is unavailable. Refresh the interface list.')
-    network = validate_subnet(subnet, interface.ip, interface.netmask)
+    network = validate_subnet(subnet, interface.ip, interface.netmask) if interface is not None else validate_subnet(subnet)
     task.check()
     import nmap
     executable = nmap_path()
@@ -97,7 +99,7 @@ def scan_subnet(subnet, interface, task=None):
     # One host at a time makes cancellation bounded without killing unrelated processes.
     for index, address in enumerate(addresses):
         task.check()
-        if interface not in list_interfaces():
+        if interface is not None and interface not in list_interfaces():
             raise ValueError('Selected interface changed during the scan; results were discarded.')
         task.report(f'Scanning {address} ({index + 1}/{len(addresses)})')
         args = [executable, '-oX', '-', str(address), '-p', COMMON_PORTS,
@@ -119,21 +121,25 @@ def scan_subnet(subnet, interface, task=None):
 
 
 def create_panel(context):
-    from PySide6.QtWidgets import QComboBox, QFormLayout, QLineEdit, QPushButton
+    from PySide6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton
     from toolkit.widgets import TaskPanel, fill_table, make_table, technical_font
 
-    panel = TaskPanel(context, 'Local Network Scanner',
-                      'TCP connect scans on the selected interface. Maximum 256 addresses. '
-                      'Only scan a network you own or administer. A filtered result cannot establish host presence.')
+    panel = TaskPanel(context, 'Network Scanner',
+                      'Local or public IPv4 TCP connect scans. Maximum 256 addresses. '
+                      'Only scan targets you own or have permission to assess. '
+                      'A filtered result cannot establish host presence.')
     form = QFormLayout()
     adapters = QComboBox()
     subnet = QLineEdit()
+    subnet.setPlaceholderText('Your authorized IPv4 address or CIDR')
     subnet.setFont(technical_font())
     refresh = QPushButton('Refresh interfaces')
-    form.addRow('Interface', adapters)
-    form.addRow('Subnet', subnet)
+    form.addRow('Target routing', adapters)
+    form.addRow('IPv4 address / subnet', subnet)
     form.addRow('', refresh)
     panel.layout.addLayout(form)
+    owned = QCheckBox('I own this target or have permission to scan it')
+    panel.layout.addWidget(owned)
     table = make_table(['IP', 'Response', 'Open common ports'])
     panel.layout.addWidget(table)
     panel.run_button.setText('Scan subnet')
@@ -148,9 +154,10 @@ def create_panel(context):
 
     def reload():
         adapters.clear()
+        adapters.addItem('Entered target (system routing)', None)
         try:
             for interface in list_interfaces():
-                adapters.addItem(f'{interface.name}: {interface.ip}', interface)
+                adapters.addItem(f'Local subnet — {interface.name}: {interface.ip}', interface)
             choose(adapters.currentIndex())
             panel.status.setText(readiness() or 'Ready. Some hosts may take up to 8 seconds each.')
         except Exception as exc:
@@ -164,17 +171,19 @@ def create_panel(context):
 
     def run():
         interface, target = adapters.currentData(), subnet.text()
-        if interface is None:
-            panel.status.setText('Select an active private interface first.')
+        if not owned.isChecked():
+            panel.status.setText('Confirm ownership or permission before scanning.')
             return
         table.setRowCount(0)
-        panel.start(lambda task: scan_subnet(target, interface, task), done)
+        permitted = owned.isChecked()
+        panel.start(lambda task: scan_subnet(target, interface, task, authorized=permitted), done)
 
     adapters.currentIndexChanged.connect(choose)
+    subnet.textChanged.connect(lambda _text: owned.setChecked(False))
     refresh.clicked.connect(reload)
     panel.run_button.clicked.connect(run)
     reload()
     return panel
 
 
-MODULE = ModuleSpec('network-scanner', 'Local Network Scanner', 30, create_panel)
+MODULE = ModuleSpec('network-scanner', 'Network Scanner', 30, create_panel)

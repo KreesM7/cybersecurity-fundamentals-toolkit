@@ -5,18 +5,22 @@ from threading import Event, Timer
 import time
 from pathlib import Path
 import ssl
+import socket
+from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
 import unittest
 
 
 class LabHandler(BaseHTTPRequestHandler):
     requests = []
+    hosts = []
 
     def log_message(self, *args):
         pass
 
     def do_GET(self):
         type(self).requests.append(('GET', self.path))
+        type(self).hosts.append(self.headers.get('Host'))
         parsed = urlsplit(self.path)
         if parsed.path == '/slow-chunks':
             try:
@@ -133,10 +137,68 @@ class SQLTests(unittest.TestCase):
             module.test_form(self.base + '/form', form, form.fields, allow_post=True)
         self.assertEqual(len(LabHandler.requests), before)
 
-    def test_public_target_blocked_without_requests(self):
+    def test_public_literal_target_is_accepted_using_controlled_transport(self):
         module = self.module()
-        with self.assertRaises(ValueError):
-            module.discover_forms('http://8.8.8.8/')
+        original_lookup = socket.getaddrinfo
+        def controlled_lookup(host, port, *args, **kwargs):
+            if host == '93.184.216.34':
+                host = '127.0.0.1'
+            return original_lookup(host, port, *args, **kwargs)
+        with patch('socket.getaddrinfo', side_effect=controlled_lookup):
+            reply = module.LimitedClient().request(f'http://93.184.216.34:{self.server.server_port}/form')
+        self.assertIn('<form', reply.text)
+        self.assertEqual(LabHandler.hosts[-1], f'93.184.216.34:{self.server.server_port}')
+
+    def test_hostname_is_pinned_per_run_and_preserves_host_header(self):
+        module = self.module()
+        original_lookup = socket.getaddrinfo
+        lookups = []
+        def controlled_lookup(host, port, *args, **kwargs):
+            if host == 'lab.test':
+                lookups.append(host)
+                if len(lookups) > 1:
+                    raise AssertionError('The hostname must be resolved once per client')
+                host = '127.0.0.1'
+            return original_lookup(host, port, *args, **kwargs)
+        with patch('socket.getaddrinfo', side_effect=controlled_lookup):
+            client = module.LimitedClient()
+            for _ in range(2):
+                reply = client.request(f'http://lab.test:{self.server.server_port}/form')
+                self.assertIn('<form', reply.text)
+        self.assertEqual(len(lookups), 1)
+        self.assertEqual(LabHandler.hosts[-2:], [f'lab.test:{self.server.server_port}'] * 2)
+
+    def test_unsupported_dns_answer_is_rejected_before_http(self):
+        module = self.module()
+        answers = [(socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, '',
+                    ('169.254.169.254', self.server.server_port))]
+        before = len(LabHandler.requests)
+        with patch('socket.getaddrinfo', return_value=answers):
+            with self.assertRaisesRegex(ValueError, 'address|DNS'):
+                module.LimitedClient().request(f'http://lab.test:{self.server.server_port}/form')
+        self.assertEqual(len(LabHandler.requests), before)
+
+    def test_dns_resolution_is_bounded_and_cancellable(self):
+        from toolkit import security
+        from toolkit.tasks import TaskContext, Cancelled
+        module = self.module()
+        for cancel in (False, True):
+            release, cancelled = Event(), Event()
+            def slow_lookup(*args, **kwargs):
+                if cancel:
+                    Timer(0.05, cancelled.set).start()
+                release.wait(2)
+                return []
+            start = time.monotonic()
+            try:
+                with patch('socket.getaddrinfo', side_effect=slow_lookup), \
+                     patch.object(security, 'DNS_SECONDS', 0.15, create=True):
+                    error = Cancelled if cancel else ValueError
+                    with self.assertRaisesRegex(error, 'DNS|Cancelled'):
+                        module.LimitedClient(TaskContext(cancelled)).request('http://lab.test/')
+                self.assertLess(time.monotonic() - start, 1)
+            finally:
+                release.set()
 
     def test_slow_headers_and_body_obey_whole_request_deadline(self):
         from unittest.mock import patch

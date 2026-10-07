@@ -1,4 +1,4 @@
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from difflib import SequenceMatcher
 import hashlib
 import math
@@ -9,7 +9,7 @@ import re
 import time
 
 from toolkit.core import ModuleSpec
-from toolkit.security import validate_form_action, validate_url
+from toolkit.security import resolve_web_target, validate_form_action, validate_url
 
 
 PROBES = ("'", '"', "''")
@@ -59,6 +59,7 @@ class LimitedClient:
         from toolkit.tasks import TaskContext
         self.task = task or TaskContext()
         self.count = 0
+        self.resolved_ips = {}
 
     def request(self, url, method='GET', fields=()):
         global _next_request_at
@@ -72,6 +73,11 @@ class LimitedClient:
         if len(encoded) > 65536:
             raise ValueError('Form input exceeds the 64 KiB request limit.')
         self.task.check()
+        key = (target.host, target.port)
+        if target.ip is None:
+            if key not in self.resolved_ips:
+                self.resolved_ips[key] = resolve_web_target(target, self.task).ip
+            target = replace(target, ip=self.resolved_ips[key])
         with _request_gate:
             self.task.wait(_next_request_at - time.monotonic())
             _next_request_at = time.monotonic() + 1.0
@@ -123,7 +129,7 @@ class LimitedClient:
                         active.close()
                     return
 
-        watchdog = Thread(target=guard, daemon=True, name='local-http-deadline')
+        watchdog = Thread(target=guard, daemon=True, name='toolkit-http-deadline')
         headers = {'Host': target.authority, 'Accept-Encoding': 'identity',
                    'User-Agent': 'CybersecurityFundamentalsToolkit/0.1'}
         if method == 'POST':
@@ -137,7 +143,7 @@ class LimitedClient:
                                     preload_content=False, assert_same_host=False)
             self.task.check()
             if 300 <= response.status < 400:
-                raise ValueError('Redirect blocked. Enter the final local URL directly.')
+                raise ValueError('Redirect blocked. Enter the final URL directly.')
             if response.headers.get('Content-Encoding', 'identity').lower() not in ('identity', ''):
                 raise ValueError('Compressed responses are unsupported; the server must honor Accept-Encoding: identity.')
             chunks, total = [], 0
@@ -243,7 +249,7 @@ def content_similarity(first, second):
 
 def test_form(source_url, form, fields, owned=False, allow_post=False, task=None):
     if not owned:
-        raise ValueError('Confirm that you own this test application before sending probes.')
+        raise ValueError('Confirm ownership or permission to test this application before sending probes.')
     base = validate_url(source_url)
     target = validate_form_action(base, form.action)
     if form.method == 'POST' and not allow_post:
@@ -303,14 +309,16 @@ def create_panel(context):
     from toolkit.widgets import TaskPanel, fill_table, make_table, technical_font
 
     panel = TaskPanel(context, 'SQL Injection Checker',
-                      'Run only against your own local test application. Even benign POST inputs can change app data. '
+                      'Test only applications you own or have permission to assess. Local and public URLs are accepted. '
+                      'Even benign POST inputs can change app data. '
                       'This checks ordinary HTML forms; results are possible issues, not proof of exploitability.')
     panel.discovery = None
+    panel.target_generation = 0
     url = QLineEdit('http://localhost:8000/')
     url.setFont(technical_font())
     forms = QComboBox()
     form_layout = QFormLayout()
-    form_layout.addRow('Local URL', url)
+    form_layout.addRow('Target URL', url)
     form_layout.addRow('Selected form', forms)
     panel.layout.addLayout(form_layout)
     fields_table = QTableWidget(0, 2)
@@ -318,7 +326,7 @@ def create_panel(context):
     fields_table.horizontalHeader().setStretchLastSection(True)
     fields_table.setFont(technical_font())
     panel.layout.addWidget(fields_table, 1)
-    owned = QCheckBox('I own this test application and authorize these probes')
+    owned = QCheckBox('I own this application or have permission to test it')
     post = QCheckBox('Enable POST testing for the selected form')
     panel.layout.addWidget(owned)
     panel.layout.addWidget(post)
@@ -341,7 +349,14 @@ def create_panel(context):
                 fields_table.setItem(row, 1, QTableWidgetItem(value))
         post.setChecked(False)
 
-    def loaded(discovery):
+    def loaded(discovery, generation):
+        try:
+            current_url = validate_url(url.text()).url
+        except ValueError:
+            current_url = None
+        if generation != panel.target_generation or current_url != discovery.url:
+            panel.status.setText('Target URL changed during discovery. Load forms for the current URL.')
+            return
         panel.discovery = discovery
         forms.clear()
         for form in discovery.forms:
@@ -352,20 +367,33 @@ def create_panel(context):
     def idle():
         test_button.setEnabled(bool(panel.discovery and panel.discovery.forms))
 
-    def load():
+    def invalidate_source(_text=None):
+        panel.target_generation += 1
+        if panel.handle:
+            panel.cancel()
         panel.discovery = None
         forms.clear()
         fields_table.setRowCount(0)
         results.setRowCount(0)
+        owned.setChecked(False)
+        post.setChecked(False)
         test_button.setEnabled(False)
+
+    def load():
+        invalidate_source()
         target_url = url.text()
-        panel.start(lambda task: discover_forms(target_url, task), loaded)
+        generation = panel.target_generation
+        panel.start(lambda task: discover_forms(target_url, task),
+                    lambda discovery: loaded(discovery, generation))
         panel.handle.finished.connect(idle)
 
-    def tested(findings):
+    def tested(findings, generation):
+        if generation != panel.target_generation:
+            panel.status.setText('Target changed; old test results were discarded.')
+            return
         fill_table(results, ((f.field, f.probe, f.status, f.evidence) for f in findings))
         panel.status.setText(f'{len(findings)} anomalous responses. '
-                             'Content differences can have other causes; review the local app manually.')
+                             'Content differences can have other causes; review the application manually.')
 
     def run_tests():
         form = forms.currentData()
@@ -374,12 +402,15 @@ def create_panel(context):
         fields = [(fields_table.item(row, 0).text(), fields_table.item(row, 1).text())
                   for row in range(fields_table.rowCount())]
         source_url, permitted, post_enabled = panel.discovery.url, owned.isChecked(), post.isChecked()
+        generation = panel.target_generation
         test_button.setEnabled(False)
         results.setRowCount(0)
-        panel.start(lambda task: test_form(source_url, form, fields, permitted, post_enabled, task), tested)
+        panel.start(lambda task: test_form(source_url, form, fields, permitted, post_enabled, task),
+                    lambda findings: tested(findings, generation))
         panel.handle.finished.connect(idle)
 
     forms.currentIndexChanged.connect(select)
+    url.textChanged.connect(invalidate_source)
     panel.run_button.clicked.connect(load)
     test_button.clicked.connect(run_tests)
     return panel

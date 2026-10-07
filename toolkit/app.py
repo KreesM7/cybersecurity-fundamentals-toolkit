@@ -36,8 +36,8 @@ class MainWindow(QMainWindow):
         title = QLabel('Cybersecurity Fundamentals Toolkit')
         title.setObjectName('heading')
         home_layout.addWidget(title)
-        text = QLabel('Local learning and inspection tools. Choose a module from the sidebar.\n'
-                      'Results are kept only for this session. Active tests are restricted to local targets.')
+        text = QLabel('Learning and inspection tools. Choose a module from the sidebar.\n'
+                      'Results stay in this session. Active tests support authorized local and public targets.')
         text.setWordWrap(True)
         home_layout.addWidget(text)
         self.readiness_table = make_table(['Module', 'Status'])
@@ -48,7 +48,7 @@ class MainWindow(QMainWindow):
         self.refresh_readiness()
         self.sidebar.currentRowChanged.connect(self.select_module)
         self.sidebar.setCurrentRow(0)
-        self.statusBar().showMessage('Local session')
+        self.statusBar().showMessage('Session in memory')
 
     def refresh_readiness(self):
         rows = []

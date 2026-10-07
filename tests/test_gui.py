@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from PySide6.QtCore import QThread, QTimer
 from PySide6.QtTest import QTest
-from PySide6.QtWidgets import QApplication, QLineEdit, QPlainTextEdit, QPushButton
+from PySide6.QtWidgets import QApplication, QCheckBox, QComboBox, QLineEdit, QPlainTextEdit, QPushButton, QTableWidget
 from toolkit.app import MainWindow, configure_theme
 from toolkit.tasks import AppContext
 from toolkit.widgets import TaskPanel
@@ -85,6 +85,30 @@ class GuiTests(unittest.TestCase):
         self.assertEqual(password.echoMode(), QLineEdit.EchoMode.Password)
         panel.close()
 
+    def test_scanner_custom_target_requires_permission_and_delivers_results(self):
+        from types import SimpleNamespace
+        from toolkit.modules import network_scanner as module
+        xml = b'''<nmaprun args="fixture"><scaninfo type="connect" protocol="tcp" services="80"/>
+          <host><status state="up" reason="user-set"/><address addr="93.184.216.34" addrtype="ipv4"/>
+          <ports><port protocol="tcp" portid="80"><state state="closed" reason="reset"/></port></ports></host>
+          <runstats><finished timestr="fixture" elapsed="0.1"/><hosts up="1" down="0" total="1"/></runstats></nmaprun>'''
+        context = AppContext()
+        with patch.object(module, 'list_interfaces', return_value=[]), \
+             patch.object(module, 'nmap_path', return_value='fixture-nmap.exe'), \
+             patch('subprocess.run', return_value=SimpleNamespace(returncode=0, stdout=xml, stderr=b'')):
+            panel = module.create_panel(context)
+            self.assertIsNone(panel.findChild(QComboBox).currentData())
+            panel.findChild(QLineEdit).setText('93.184.216.34')
+            panel.run_button.click()
+            self.assertFalse(context.jobs)
+            self.assertIn('permission', panel.status.text())
+            panel.findChild(QCheckBox).setChecked(True)
+            panel.run_button.click()
+            self.wait_until(lambda: not context.jobs)
+            self.assertEqual(panel.findChild(QTableWidget).item(0, 0).text(), '93.184.216.34')
+            self.assertIn('1 responding', panel.status.text())
+            panel.close()
+
     def test_missing_dependencies_do_not_prevent_navigation(self):
         import builtins
         real_import = builtins.__import__
@@ -103,6 +127,67 @@ class GuiTests(unittest.TestCase):
             statuses = [window.readiness_table.item(row, 1).text() for row in range(7)]
             self.assertTrue(any('Setup' in status for status in statuses))
             window.close()
+
+    def test_changing_web_target_clears_permission_and_loaded_forms(self):
+        from toolkit.modules import sql_checker as module
+        context = AppContext()
+        panel = module.create_panel(context)
+        form = module.FormSpec('http://localhost:8000/search', 'GET', [('q', 'hello')])
+        discovery = module.Discovery('http://localhost:8000/', [form], [])
+        with patch.object(module, 'discover_forms', return_value=discovery):
+            panel.run_button.click()
+            self.wait_until(lambda: not context.jobs)
+        permission = next(box for box in panel.findChildren(QCheckBox) if 'permission' in box.text())
+        test_button = next(button for button in panel.findChildren(QPushButton) if button.text() == 'Test selected form')
+        self.assertTrue(test_button.isEnabled())
+        permission.setChecked(True)
+        panel.findChild(QLineEdit).setText('https://example.com/')
+        self.assertFalse(permission.isChecked())
+        self.assertFalse(test_button.isEnabled())
+        self.assertIsNone(panel.discovery)
+        self.assertEqual(panel.findChild(QComboBox).count(), 0)
+        panel.close()
+
+    def test_web_target_edits_discard_late_discovery_and_probe_results(self):
+        from threading import Event
+        from toolkit.modules import sql_checker as module
+        form = module.FormSpec('http://localhost:8000/search', 'GET', [('q', 'hello')])
+        discovery = module.Discovery('http://localhost:8000/', [form], [])
+        for operation in ('discovery', 'probes'):
+            with self.subTest(operation=operation):
+                context = AppContext()
+                panel = module.create_panel(context)
+                entered, release = Event(), Event()
+                target = panel.findChild(QLineEdit)
+                def delayed(*args, **kwargs):
+                    entered.set()
+                    release.wait(2)
+                    return discovery if operation == 'discovery' else [
+                        module.Finding('q', "'", 500, 'Old target evidence')]
+                try:
+                    if operation == 'probes':
+                        with patch.object(module, 'discover_forms', return_value=discovery):
+                            panel.run_button.click()
+                            self.wait_until(lambda: not context.jobs)
+                        next(box for box in panel.findChildren(QCheckBox) if 'permission' in box.text()).setChecked(True)
+                    attribute = 'discover_forms' if operation == 'discovery' else 'test_form'
+                    with patch.object(module, attribute, side_effect=delayed):
+                        if operation == 'discovery':
+                            panel.run_button.click()
+                        else:
+                            next(button for button in panel.findChildren(QPushButton)
+                                 if button.text() == 'Test selected form').click()
+                        self.wait_until(entered.is_set)
+                        target.setText('https://example.com/')
+                        target.setText('http://localhost:8000/')
+                        release.set()
+                        self.wait_until(lambda: not context.jobs)
+                    self.assertIsNone(panel.discovery)
+                    self.assertTrue(all(table.rowCount() == 0 for table in panel.findChildren(QTableWidget)))
+                finally:
+                    release.set()
+                    self.wait_until(lambda: not context.jobs)
+                    panel.close()
 
     def test_resources_resolve_from_another_working_directory(self):
         from toolkit.core import resource_text

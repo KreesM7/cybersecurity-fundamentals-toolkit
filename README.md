@@ -19,6 +19,23 @@ python -m toolkit
 python -m unittest discover -s tests -v
 ```
 
+On Windows, you can also double-click `Start-Toolkit.cmd` after setup, or run `.\Start-Toolkit.cmd` from PowerShell. It uses this project's environment and sets the correct working directory. Startup errors remain visible in its console.
+
+If `py -3.12` reports **No suitable Python runtime found**, the environment was not created; the following `.venv` commands cannot work yet. Use an explicit path to a Python 3.12 executable instead. On a computer with Codex's bundled Python runtime, this fallback is available:
+
+```powershell
+$toolkitPython = Join-Path $env:USERPROFILE '.cache\codex-runtimes\codex-primary-runtime\dependencies\python\python.exe'
+if (-not (Test-Path -LiteralPath $toolkitPython)) { throw 'Codex Python runtime not found. Install 64-bit Python 3.12 first.' }
+& $toolkitPython --version
+& $toolkitPython -m venv .venv
+if ($LASTEXITCODE -ne 0) { throw 'Environment creation failed. Resolve the error above before continuing.' }
+.\.venv\Scripts\python.exe -m pip install -r requirements.txt
+if ($LASTEXITCODE -ne 0) { throw 'Package installation failed. Resolve the error above before continuing.' }
+.\Start-Toolkit.cmd
+```
+
+The displayed version must be Python 3.12. The Codex cache path may change after an app update; a regular Python installation is the portable setup option.
+
 All direct dependency pins, including the build tool, live in `requirements.txt`. Home reports readiness for each module. Missing Python or native components affect the corresponding module; the shell still opens. Click Home again to refresh readiness after changing setup. Restart after changing DLL paths.
 
 ## Use the modules

@@ -21,5 +21,5 @@ TOOL = ToolSpec(
     analysis.MODULE.title,
     analysis.MODULE.order,
     run,
-    note="CSV/log ready; saved captures require the separate PCAP worker.",
+    note="CSV/log ready; checking independently installed saved-capture worker.",
 )

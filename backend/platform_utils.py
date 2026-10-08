@@ -14,7 +14,7 @@ from contextlib import suppress
 from ctypes import wintypes
 from dataclasses import dataclass
 from pathlib import Path
-from typing import BinaryIO
+from typing import BinaryIO, TypedDict
 
 
 def is_windows() -> bool:
@@ -108,6 +108,26 @@ def wsl_argv(args: Sequence[str]) -> list[str]:
     if not args or any("\0" in argument for argument in args):
         raise ValueError("Nonempty executable arguments are required")
     return ["wsl.exe", "--distribution", "Toolkit-MSF", "--exec", *args]
+
+
+def capture_worker_argv(arguments: Sequence[str]) -> list[str]:
+    """Invoke only the independently installed worker, never frozen application Python."""
+    if is_windows():
+        return wsl_argv(["/opt/toolkit-scapy/bin/python", "-m", "toolkit_scapy_worker", *arguments])
+    override = os.environ.get("TOOLKIT_SCAPY_PYTHON", "/opt/toolkit-scapy/bin/python")
+    candidate = Path(override).expanduser()
+    if not candidate.is_absolute() or not candidate.is_file() or not os.access(candidate, os.X_OK):
+        raise ValueError("Install the separate capture worker. See docs/SCAPY_WORKER.md.")
+    return [str(candidate), "-m", "toolkit_scapy_worker", *arguments]
+
+
+class HiddenProcessOptions(TypedDict):
+    creationflags: int
+
+
+def hidden_process_options() -> HiddenProcessOptions:
+    """Do not open a console window for an owned helper."""
+    return {"creationflags": getattr(subprocess, "CREATE_NO_WINDOW", 0)}
 
 
 def _reject_links(path: Path) -> None:

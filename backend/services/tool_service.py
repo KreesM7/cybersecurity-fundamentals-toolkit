@@ -7,7 +7,7 @@ import builtins
 import math
 import time
 from dataclasses import asdict, dataclass
-from pathlib import PurePosixPath
+from pathlib import Path, PurePosixPath
 from typing import Literal, cast
 from uuid import UUID, uuid4
 
@@ -31,6 +31,7 @@ from shared.tools import (
 )
 from toolkit.security import validate_form_action, validate_url
 from toolkit.task_context import TaskContext
+from toolkit.traffic import TrafficData
 
 MAX_FILE_BYTES = 25 * 1024 * 1024
 
@@ -70,6 +71,10 @@ class ToolService:
                     reason=reason or spec.note,
                 )
             )
+            if spec.id in {"dos-detector", "anomaly-detector"} and not reason:
+                from backend.services.traffic_worker import readiness
+
+                rows[-1].reason = await readiness()
         return sorted(rows, key=lambda row: (row.order, row.id))
 
     async def interfaces(self) -> builtins.list[InterfaceView]:
@@ -205,6 +210,15 @@ class ToolService:
                 "notes": discovery.notes,
             }
         task = TaskContext(context.cancel_event)
+        if isinstance(options, (DoSOptions, AnomalyOptions)) and Path(filename).suffix.lower() in {
+            ".pcap",
+            ".pcapng",
+        }:
+            from backend.services.traffic_worker import read_capture
+
+            assert content is not None
+            data = await read_capture(content, context)
+            return await context.run_sync(lambda: self._traffic(options, data, task))
         return await context.run_sync(lambda: self._cpu(options, content, filename, task))
 
     @staticmethod
@@ -235,54 +249,61 @@ class ToolService:
             data = read_traffic_bytes(
                 content, filename, require_volume=isinstance(options, AnomalyOptions), task=task
             )
-            metadata = {
-                "events": len(data.events),
-                "unit": data.unit,
-                "complete": data.complete,
-                "skipped": data.skipped,
-                "warnings": data.warnings,
-            }
-            if isinstance(options, DoSOptions):
-                from toolkit.modules.dos_detector import detect_spikes
+            return ToolService._traffic(options, data, task)
+        raise ValueError("Unsupported tool inputs.")
 
-                findings = detect_spikes(data.events, options.threshold, task)
-                return {
-                    **metadata,
-                    "total": len(findings),
-                    "spikes": [asdict(row) for row in findings[:5000]],
-                }
-            from toolkit.modules.anomaly_detector import detect_anomalies
+    @staticmethod
+    def _traffic(
+        options: DoSOptions | AnomalyOptions, data: TrafficData, task: TaskContext
+    ) -> object:
+        task.check()
+        metadata = {
+            "events": len(data.events),
+            "unit": data.unit,
+            "complete": data.complete,
+            "skipped": data.skipped,
+            "warnings": data.warnings,
+        }
+        if isinstance(options, DoSOptions):
+            from toolkit.modules.dos_detector import detect_spikes
 
-            report = detect_anomalies(
-                data.events,
-                options.bin_seconds,
-                options.baseline_bins,
-                options.threshold,
-                task=task,
-            )
-            rows = []
-            for row in report.anomalies:
-                score = row.zscore
-                rows.append(
-                    {
-                        **asdict(row),
-                        "zscore": score if math.isfinite(score) else None,
-                        "score_kind": (
-                            "finite"
-                            if math.isfinite(score)
-                            else "positive_infinity" if score > 0 else "negative_infinity"
-                        ),
-                    }
-                )
+            findings = detect_spikes(data.events, options.threshold, task)
             return {
                 **metadata,
-                "sufficient": report.sufficient,
-                "status": "analyzed" if report.sufficient else "insufficient_baseline",
-                "examined": report.examined,
-                "total": report.total,
-                "anomalies": rows,
+                "total": len(findings),
+                "spikes": [asdict(row) for row in findings[:5000]],
             }
-        raise ValueError("Unsupported tool inputs.")
+        from toolkit.modules.anomaly_detector import detect_anomalies
+
+        report = detect_anomalies(
+            data.events,
+            options.bin_seconds,
+            options.baseline_bins,
+            options.threshold,
+            task=task,
+        )
+        rows = []
+        for row in report.anomalies:
+            score = row.zscore
+            rows.append(
+                {
+                    **asdict(row),
+                    "zscore": score if math.isfinite(score) else None,
+                    "score_kind": (
+                        "finite"
+                        if math.isfinite(score)
+                        else "positive_infinity" if score > 0 else "negative_infinity"
+                    ),
+                }
+            )
+        return {
+            **metadata,
+            "sufficient": report.sufficient,
+            "status": "analyzed" if report.sufficient else "insufficient_baseline",
+            "examined": report.examined,
+            "total": report.total,
+            "anomalies": rows,
+        }
 
     async def close(self) -> None:
         self.discoveries.clear()

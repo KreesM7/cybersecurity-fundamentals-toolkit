@@ -9,6 +9,7 @@ import json
 import secrets
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
+from pathlib import Path
 from typing import Literal, Protocol
 from uuid import UUID
 
@@ -79,11 +80,40 @@ class MemoryMutationStore:
 class MutationCoordinator:
     """Reserve before executing; completion never stores request bodies or exception text."""
 
-    def __init__(self, store: MutationStore) -> None:
+    def __init__(self, store: MutationStore, *, profile: Path | None = None) -> None:
         self.store = store
         self._secrets = MemoryMutationStore()
         self._fingerprint_key = secrets.token_bytes(32)
         self._locks: dict[tuple[UUID, UUID], asyncio.Lock] = {}
+        self._durable_key: bytes | None = None
+        if profile is not None:
+            from backend.platform_utils import assert_private_path, atomic_private_write
+
+            key_path = profile / "mutation.key"
+            if not key_path.exists():
+                atomic_private_write(key_path, secrets.token_bytes(32))
+            assert_private_path(key_path)
+            key = key_path.read_bytes()
+            if len(key) != 32:
+                raise ValueError("Mutation key is invalid; restore the profile backup.")
+            self._durable_key = key
+
+    async def execute_external(
+        self,
+        workspace_id: UUID,
+        request_id: UUID,
+        operation: str,
+        payload: JsonValue,
+        action: Callable[[], Awaitable[object]],
+    ) -> JsonValue:
+        """Persist a keyed identity before dispatch; action returns only safe outcome metadata."""
+        if self._durable_key is None:
+            raise RuntimeError("External mutations require a protected profile key.")
+        canonical = json.dumps(payload, sort_keys=True, separators=(",", ":"), allow_nan=False)
+        fingerprint = hmac.new(self._durable_key, canonical.encode(), hashlib.sha256).hexdigest()
+        return await self.execute(
+            workspace_id, request_id, "external:" + operation, fingerprint, action
+        )
 
     async def execute(
         self,

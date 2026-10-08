@@ -1,6 +1,6 @@
 # Cybersecurity Fundamentals Toolkit
 
-One native desktop application for seven local learning and inspection tools. Python 3.12, Windows x64, PySide6 Essentials. There is no browser UI, application server, live packet capture, telemetry, or persistent results store. The text sidebar stays available while background work runs.
+One native desktop application for seven learning and inspection tools. The v2 source uses Python3.11/3.12, PyQt6 and a private authenticated HTTPS backend inside the desktop process. Workspace data is stored locally; entered passwords and automatic analysis results stay in memory. There is no live packet capture or telemetry. The text sidebar stays available while background work runs. The v2 release is still being implemented; the handoff describes remaining features, not a completed release.
 
 ## Setup and run
 
@@ -162,3 +162,7 @@ MODULE = ModuleSpec('example', 'Example', 80, create_panel)
 Optionally define `readiness()` returning an actionable message or `''` for ready. Import optional libraries inside analysis/readiness; import Qt panel helpers inside the factory. Missing dependencies and load/factory exceptions are isolated. IDs must be unique lowercase words with hyphens. Factories accept shared `AppContext` and return a Qt widget. `context.run_task(...)` provides cancellation/progress and main-thread callbacks; `context.resource_text(name)` reads bundled UTF-8 resources independent of working directory. Workers receive ordinary data snapshots, never widgets; analysis functions enforce their own target restrictions. Add resources under `toolkit/resources/`, tests under `tests/`, and rebuild the spec to include the new module.
 
 Git history is local and records verified implementation slices. Errors remain local; no Sentry telemetry is configured.
+
+## Metasploit setup (v2)
+
+See [dedicated Toolkit-MSF provisioning and verified TLS connection](docs/MSFRPC_SETUP.md). This setup leaves other WSL distributions untouched.

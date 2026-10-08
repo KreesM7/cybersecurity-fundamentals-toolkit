@@ -25,7 +25,9 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.request_limits import RequestBodyLimit
-from backend.routers import targets, tools, workspaces
+from backend.routers import connection, targets, tools, workspaces
+from backend.services.metasploit_service import MetasploitService
+from backend.services.rpc_transport import RpcFailure
 from backend.services.tool_service import ToolService
 from backend.services.workspace_service import (
     WorkspaceConflictError,
@@ -71,9 +73,13 @@ def create_app(
         app.state.workspaces = service
         app.state.events = hub
         app.state.jobs = jobs
-        app.state.mutations = MutationCoordinator(SQLAlchemyMutationStore(service.catalog_sessions))
         tool_service: ToolService | None = None
+        framework = MetasploitService(profile, hub)
+        app.state.framework = framework
         try:
+            app.state.mutations = MutationCoordinator(
+                SQLAlchemyMutationStore(service.catalog_sessions), profile=profile
+            )
             tool_service = ToolService(service, jobs)
             app.state.tools = tool_service
             yield
@@ -82,8 +88,11 @@ def create_app(
                 await jobs.close()
             finally:
                 try:
-                    if tool_service is not None:
-                        await tool_service.close()
+                    try:
+                        await framework.close()
+                    finally:
+                        if tool_service is not None:
+                            await tool_service.close()
                 finally:
                     try:
                         await hub.close()
@@ -112,6 +121,7 @@ def create_app(
     app.include_router(workspaces.router, prefix="/api/v1")
     app.include_router(targets.router, prefix="/api/v1")
     app.include_router(tools.router, prefix="/api/v1")
+    app.include_router(connection.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -129,6 +139,8 @@ def create_app(
     async def known_error(request: Request, exc: Exception) -> JSONResponse:
         if isinstance(exc, (MutationConflictError, UnknownOutcomeError, WorkspaceConflictError)):
             status, detail = 409, str(exc)
+        elif isinstance(exc, RpcFailure):
+            status, detail = 503, str(exc)
         elif isinstance(exc, (MutationCapacityError, JobQueueFullError)):
             status, detail = 429, str(exc)
         elif isinstance(exc, (KeyError, WorkspaceNotFoundError)):
@@ -149,6 +161,7 @@ def create_app(
         JobQueueFullError,
         KeyError,
         ValueError,
+        RpcFailure,
     ):
         app.add_exception_handler(exception, known_error)
 

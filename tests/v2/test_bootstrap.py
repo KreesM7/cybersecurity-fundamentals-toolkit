@@ -1,18 +1,105 @@
 from __future__ import annotations
 
+import asyncio
 import secrets
 import tempfile
 import unittest
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
+import httpx
+import pytest
 from cryptography import x509
 from fastapi import FastAPI, WebSocket
 from fastapi.testclient import TestClient
 
 from backend.auth import authenticate_websocket, install_auth
-from backend.bootstrap import InstanceLocator, read_locator, write_locator
+from backend.bootstrap import InstanceLocator, read_locator, wait_ready, write_locator
 from backend.tls import ensure_tls
+
+
+@pytest.mark.parametrize("failure", [httpx.ConnectTimeout, httpx.ReadTimeout])
+async def test_readiness_retries_transient_timeouts_with_authenticated_tls(
+    tmp_path: Path, failure: type[httpx.TimeoutException]
+) -> None:
+    tls = ensure_tls(tmp_path)
+    locator = InstanceLocator.fresh(44321, "b" * 64, tls.fingerprint)
+    requests: list[httpx.Request] = []
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        requests.append(request)
+        if len(requests) == 1:
+            raise failure("Transient startup timeout", request=request)
+        return httpx.Response(200, json={"instance_id": str(locator.instance_id)})
+
+    original_client = httpx.AsyncClient
+    with patch(
+        "backend.bootstrap.httpx.AsyncClient",
+        side_effect=lambda **kwargs: original_client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    ) as factory:
+        await wait_ready(locator, tls, timeout=1)
+    assert len(requests) == 2
+    assert all(request.headers["Authorization"] == "Bearer " + "b" * 64 for request in requests)
+    assert all(str(request.url) == "https://127.0.0.1:44321/api/v1/health" for request in requests)
+    context = factory.call_args.kwargs["verify"]
+    assert context.check_hostname
+    assert factory.call_args.kwargs["trust_env"] is False
+    assert factory.call_args.kwargs["follow_redirects"] is False
+
+
+async def test_readiness_retries_share_one_overall_deadline(tmp_path: Path) -> None:
+    tls = ensure_tls(tmp_path)
+    locator = InstanceLocator.fresh(44321, "b" * 64, tls.fingerprint)
+    attempts = 0
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        nonlocal attempts
+        attempts += 1
+        raise httpx.ConnectTimeout("Still starting", request=request)
+
+    original_client = httpx.AsyncClient
+    with patch(
+        "backend.bootstrap.httpx.AsyncClient",
+        side_effect=lambda **kwargs: original_client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    ):
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(wait_ready(locator, tls, timeout=0.12), 1)
+        elapsed = asyncio.get_running_loop().time() - started
+    assert attempts >= 2
+    assert elapsed < 0.8, "Readiness did not honor its own startup deadline"
+
+
+async def test_readiness_deadline_cancels_a_stalled_request(tmp_path: Path) -> None:
+    tls = ensure_tls(tmp_path)
+    locator = InstanceLocator.fresh(44321, "b" * 64, tls.fingerprint)
+    cancelled = asyncio.Event()
+
+    async def handle(request: httpx.Request) -> httpx.Response:
+        try:
+            await asyncio.Event().wait()
+        finally:
+            cancelled.set()
+        raise AssertionError("Unreachable")
+
+    original_client = httpx.AsyncClient
+    with patch(
+        "backend.bootstrap.httpx.AsyncClient",
+        side_effect=lambda **kwargs: original_client(
+            transport=httpx.MockTransport(handle), **kwargs
+        ),
+    ):
+        started = asyncio.get_running_loop().time()
+        with pytest.raises(TimeoutError):
+            await asyncio.wait_for(wait_ready(locator, tls, timeout=0.05), 1)
+        elapsed = asyncio.get_running_loop().time() - started
+    assert cancelled.is_set()
+    assert elapsed < 0.8, "A stalled health request escaped the overall deadline"
 
 
 class BootstrapTests(unittest.TestCase):

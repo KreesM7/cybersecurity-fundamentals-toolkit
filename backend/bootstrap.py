@@ -6,6 +6,7 @@ import asyncio
 import os
 import secrets
 import socket
+import ssl
 from dataclasses import dataclass
 from pathlib import Path
 from uuid import UUID, uuid4
@@ -198,6 +199,7 @@ def prepare_backend(profile: Path, *, lease: ProfileLease | None = None) -> Back
 
 
 async def wait_ready(locator: InstanceLocator, tls: TLSMaterial, *, timeout: float = 10.0) -> None:
+    """Retry transient startup transport failures within one authenticated TLS deadline."""
     async with httpx.AsyncClient(
         verify=tls.client_context(), trust_env=False, timeout=1.0, follow_redirects=False
     ) as client:
@@ -212,5 +214,19 @@ async def wait_ready(locator: InstanceLocator, tls: TLSMaterial, *, timeout: flo
                     if reply.json().get("instance_id") != str(locator.instance_id):
                         raise ValueError("Startup backend identity mismatch.")
                     return
-                except (httpx.ConnectError, httpx.ReadError):
+                except (
+                    httpx.ConnectError,
+                    httpx.ReadError,
+                    httpx.ConnectTimeout,
+                    httpx.ReadTimeout,
+                ) as exc:
+                    # HTTPX wraps TLS errors as connection failures; retrying those would
+                    # hide a trust/handshake failure behind a generic startup timeout.
+                    cause: BaseException | None = exc
+                    seen: set[int] = set()
+                    while cause is not None and id(cause) not in seen:
+                        seen.add(id(cause))
+                        if isinstance(cause, ssl.SSLError):
+                            raise
+                        cause = cause.__cause__ or cause.__context__
                     await asyncio.sleep(0.05)

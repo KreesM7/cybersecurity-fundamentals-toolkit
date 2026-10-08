@@ -9,10 +9,27 @@ from urllib.parse import urlsplit
 from uuid import UUID, uuid4
 
 import httpx
+from pydantic import BaseModel
 
 from shared.schemas import HealthResponse, SchemaModel
+from shared.tools import PasswordOptions
 
-Model = TypeVar("Model", bound=SchemaModel)
+Model = TypeVar("Model", bound=BaseModel)
+MAX_RESPONSE_BYTES = 16 * 1024 * 1024
+MAX_UPLOAD_BYTES = 25 * 1024 * 1024
+
+
+class ApiError(httpx.HTTPStatusError):
+    """Actionable backend detail without response/request body or credential retention."""
+
+    def __init__(self, message: str) -> None:
+        # Preserve the existing HTTPStatusError contract with sanitized local context.
+        # Never retain the actual request, which can contain a password body.
+        super().__init__(
+            message,
+            request=httpx.Request("GET", "https://127.0.0.1/"),
+            response=httpx.Response(400),
+        )
 
 
 def validate_connection(base_url: str, ssl_context: ssl.SSLContext, instance_token: str) -> None:
@@ -74,14 +91,72 @@ class ApiClient:
             raise ValueError("Authorization, Host and X-Request-ID headers cannot be overridden")
         if method.upper() in {"POST", "PUT", "PATCH", "DELETE"}:
             request_headers["X-Request-ID"] = str(request_id or uuid4())
-        response = await self._client.request(
+        payload = (
+            body.transport_dump()
+            if isinstance(body, PasswordOptions)
+            else body.model_dump(mode="json") if body is not None else None
+        )
+        async with self._client.stream(
             method,
             path,
-            json=body.model_dump(mode="json") if body is not None else None,
+            json=payload,
             headers=request_headers,
-        )
-        response.raise_for_status()
-        return response_type.model_validate_json(response.content)
+        ) as response:
+            content = await self._bounded_response(response)
+            if response.status_code == 204:
+                return response_type.model_validate({})
+            return response_type.model_validate_json(content)
+
+    @staticmethod
+    async def _bounded_response(response: httpx.Response) -> bytes:
+        chunks, total = [], 0
+        async for chunk in response.aiter_bytes():
+            total += len(chunk)
+            if total > MAX_RESPONSE_BYTES:
+                raise ApiError(
+                    "Backend response exceeds the 16 MiB limit. "
+                    "Clear the result and use a smaller input."
+                )
+            chunks.append(chunk)
+        content = b"".join(chunks)
+        if not response.is_success:
+            detail = "Backend action failed. Check fields, readiness and workspace selection."
+            try:
+                from json import loads
+
+                value = loads(content).get("detail")
+                if isinstance(value, str):
+                    detail = value[:1000]
+            except (ValueError, AttributeError):
+                pass
+            raise ApiError(detail)
+        return content
+
+    async def upload(
+        self,
+        path: str,
+        response_type: type[Model],
+        body: SchemaModel,
+        content: bytes,
+        filename: str,
+        *,
+        request_id: UUID,
+    ) -> Model:
+        if not path.startswith("/api/v1/") or urlsplit(path).netloc or "\\" in path:
+            raise ValueError("Expected a local /api/v1/ resource")
+        if len(content) > MAX_UPLOAD_BYTES:
+            raise ApiError("Selected file exceeds the 25 MiB upload limit.")
+        from pathlib import PurePosixPath
+
+        basename = PurePosixPath(filename.replace("\\", "/")).name
+        async with self._client.stream(
+            "POST",
+            path,
+            headers={"X-Request-ID": str(request_id)},
+            data={"options": body.model_dump_json()},
+            files={"file": (basename, content, "application/octet-stream")},
+        ) as response:
+            return response_type.model_validate_json(await self._bounded_response(response))
 
     async def health(self) -> HealthResponse:
         """Fetch actual backend identity and readiness."""

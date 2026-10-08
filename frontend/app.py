@@ -1,0 +1,102 @@
+"""One PyQt6 runtime, authenticated TLS backend bootstrap and orderly ownership."""
+
+import argparse
+import os
+import sys
+import tempfile
+from pathlib import Path
+
+from PyQt6.QtCore import QTimer
+from PyQt6.QtWidgets import QApplication, QLabel
+
+from backend.bootstrap import InstanceLocator
+from backend.platform_utils import get_config_dir
+from backend.tls import TLSMaterial
+from frontend.main_window import MainWindow
+from frontend.runtime import BackendThread
+from frontend.theme import apply_theme
+from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.views.tools.base import ToolPanel
+
+
+def main(argv: list[str] | None = None) -> int:
+    parser = argparse.ArgumentParser(description="Cybersecurity Fundamentals Toolkit desktop")
+    parser.add_argument("--profile", type=Path)
+    parser.add_argument("--self-test", action="store_true")
+    args = parser.parse_args(argv)
+    temporary = tempfile.TemporaryDirectory() if args.self_test and args.profile is None else None
+    profile = args.profile or (Path(temporary.name) if temporary else get_config_dir())
+    if args.self_test:
+        os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
+    application = QApplication(sys.argv[:1])
+    application.setApplicationName("Cybersecurity Fundamentals Toolkit")
+    apply_theme(application, "dark")
+    launcher = QLabel("Starting the authenticated local backend…")
+    launcher.setWindowTitle("Cybersecurity Fundamentals Toolkit")
+    launcher.resize(600, 120)
+    launcher.show()
+    backend = BackendThread(profile)
+    windows: list[MainWindow] = []
+    models: list[ToolsViewModel] = []
+    result = 0
+
+    def failed(message: str) -> None:
+        nonlocal result
+        result = 2
+        launcher.setText(message)
+        if args.self_test:
+            application.exit(result)
+
+    def ready(locator: object, material: object, owned: bool) -> None:
+        if not isinstance(locator, InstanceLocator) or not isinstance(material, TLSMaterial):
+            failed("Invalid backend startup result. Restart the application.")
+            return
+        model = ToolsViewModel(
+            f"https://127.0.0.1:{locator.port}",
+            material.client_context(),
+            locator.token.get_secret_value(),
+        )
+        window = MainWindow(model)
+        models.append(model)
+        windows.append(window)
+        launcher.hide()
+        window.show()
+        model.refresh_health()
+        model.refresh_tools()
+        if args.self_test:
+
+            def finish(values: object) -> None:
+                if len(window.panels) != 7 or not all(
+                    isinstance(panel, ToolPanel) for panel in window.panels.values()
+                ):
+                    failed("Seven tool panels could not be created.")
+                    return
+                for index in range(window.stack.count()):
+                    window.stack.setCurrentIndex(index)
+                window.close()
+                application.exit(0)
+
+            model.tools_changed.connect(finish)
+
+    backend.ready.connect(ready)
+    backend.failed.connect(failed)
+    backend.start()
+    timeout = QTimer()
+    if args.self_test:
+        timeout.setSingleShot(True)
+        timeout.timeout.connect(
+            lambda: failed("Desktop startup timed out. Check backend prerequisites.")
+        )
+        timeout.start(20000)
+    try:
+        exit_code = application.exec()
+        return result or exit_code
+    finally:
+        for model in models:
+            if model.is_running:
+                model.close()
+        backend.stop()
+        if not backend.wait(15000):
+            raise RuntimeError("Backend shutdown timed out. Close owned jobs before retrying.")
+        if temporary is not None:
+            temporary.cleanup()

@@ -6,6 +6,7 @@ import importlib
 import os
 import shutil
 import stat
+import subprocess
 import sys
 import tempfile
 from collections.abc import Sequence
@@ -51,6 +52,38 @@ def executable(name: str) -> Path | None:
         raise ValueError("Expected a simple executable name")
     found = shutil.which(name)
     return Path(found) if found else None
+
+
+def find_nmap_binary() -> Path | None:
+    """Locate native Nmap; an invalid explicit override fails instead of falling back."""
+    override = os.environ.get("TOOLKIT_NMAP")
+    if override:
+        candidate = Path(override).expanduser().absolute()
+        if not candidate.is_file() or (not is_windows() and not os.access(candidate, os.X_OK)):
+            raise ValueError("TOOLKIT_NMAP must name an existing executable Nmap file.")
+        return candidate
+    found = executable("nmap")
+    if found is not None:
+        return found
+    if is_windows():
+        for variable in ("ProgramFiles", "ProgramFiles(x86)"):
+            directory = os.environ.get(variable)
+            if directory:
+                candidate = Path(directory) / "Nmap" / "nmap.exe"
+                if candidate.is_file():
+                    return candidate
+    return None
+
+
+def magic_database() -> Path | None:
+    """Validate an optional external libmagic database without creating native handles."""
+    override = os.environ.get("TOOLKIT_MAGIC_FILE")
+    if not override:
+        return None
+    candidate = Path(override).expanduser().absolute()
+    if not candidate.is_file():
+        raise ValueError("TOOLKIT_MAGIC_FILE must name an existing magic.mgc database.")
+    return candidate
 
 
 def find_msf_binary(name: str) -> Path | None:
@@ -368,7 +401,10 @@ async def run_process(
     if not args or timeout <= 0 or max_output_bytes < 1:
         raise ValueError("Arguments, positive timeout and output limit are required")
     process = await asyncio.create_subprocess_exec(
-        *args, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        *args,
+        stdout=asyncio.subprocess.PIPE,
+        stderr=asyncio.subprocess.PIPE,
+        creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
     )
     used = 0
 

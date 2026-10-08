@@ -25,7 +25,8 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.request_limits import RequestBodyLimit
-from backend.routers import targets, workspaces
+from backend.routers import targets, tools, workspaces
+from backend.services.tool_service import ToolService
 from backend.services.workspace_service import (
     WorkspaceConflictError,
     WorkspaceNotFoundError,
@@ -71,16 +72,23 @@ def create_app(
         app.state.events = hub
         app.state.jobs = jobs
         app.state.mutations = MutationCoordinator(SQLAlchemyMutationStore(service.catalog_sessions))
+        tool_service: ToolService | None = None
         try:
+            tool_service = ToolService(service, jobs)
+            app.state.tools = tool_service
             yield
         finally:
             try:
                 await jobs.close()
             finally:
                 try:
-                    await hub.close()
+                    if tool_service is not None:
+                        await tool_service.close()
                 finally:
-                    await service.close()
+                    try:
+                        await hub.close()
+                    finally:
+                        await service.close()
 
     app = PrivateAPI(
         title="Cybersecurity Fundamentals Toolkit",
@@ -103,6 +111,7 @@ def create_app(
     install_auth(app, instance_token, allowed_origins=origins)
     app.include_router(workspaces.router, prefix="/api/v1")
     app.include_router(targets.router, prefix="/api/v1")
+    app.include_router(tools.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

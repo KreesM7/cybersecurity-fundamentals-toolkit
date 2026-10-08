@@ -15,7 +15,10 @@ from PyQt6.QtWidgets import (
 )
 
 from frontend.viewmodels.base_vm import BaseViewModel
+from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.views.tools import PANELS, create_panel
 from shared.schemas import HealthResponse
+from shared.tools import ToolView
 
 
 class MainWindow(QMainWindow):
@@ -49,6 +52,9 @@ class MainWindow(QMainWindow):
         content.addWidget(page_title)
         content.addWidget(self.health_label)
         content.addWidget(self.error_label)
+        self.readiness_label = QLabel("Tool readiness has not been checked.")
+        self.readiness_label.setWordWrap(True)
+        content.addWidget(self.readiness_label)
         content.addWidget(refresh)
         content.addStretch()
         self.stack.addWidget(dashboard)
@@ -59,6 +65,24 @@ class MainWindow(QMainWindow):
         self.setCentralWidget(central)
         view_model.health_changed.connect(self._show_health)
         view_model.error_changed.connect(self.error_label.setText)
+        self.panels: dict[str, QWidget] = {}
+        if isinstance(view_model, ToolsViewModel):
+            refresh.clicked.connect(view_model.refresh_tools)
+            for tool_id, title in PANELS:
+                panel = create_panel(tool_id, view_model)
+                self.panels[tool_id] = panel
+                self.register_view(title, panel)
+            view_model.tools_changed.connect(self._show_tools)
+
+    def _show_tools(self, values: object) -> None:
+        if isinstance(values, list):
+            self.readiness_label.setText(
+                "\n".join(
+                    f"{value.title}: {value.reason or 'Ready'}"
+                    for value in values
+                    if isinstance(value, ToolView)
+                )
+            )
 
     @pyqtSlot(object)
     def _show_health(self, health: object) -> None:

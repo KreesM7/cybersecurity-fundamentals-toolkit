@@ -1,4 +1,6 @@
-from toolkit.app import main
+"""Launch the authenticated PyQt6 desktop."""
 
-if __name__ == '__main__':
+from frontend.app import main
+
+if __name__ == "__main__":
     raise SystemExit(main())

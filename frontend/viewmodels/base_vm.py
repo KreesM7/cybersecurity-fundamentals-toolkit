@@ -4,14 +4,17 @@ import asyncio
 import ssl
 from collections.abc import Mapping
 from concurrent.futures import Future
+from pathlib import Path
 from uuid import UUID, uuid4
 
 import httpx
+from pydantic import BaseModel
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 
-from frontend.api_client import ApiClient, validate_connection
+from frontend.api_client import MAX_UPLOAD_BYTES, ApiClient, ApiError, validate_connection
 from frontend.ws_client import WebSocketClient
 from shared.schemas import HealthResponse, SchemaModel
+from shared.tools import EmptyResponse, ToolJob
 
 
 class ClientWorker(QThread):
@@ -20,6 +23,7 @@ class ClientWorker(QThread):
     health_received = pyqtSignal(object)
     message_received = pyqtSignal(object)
     mutation_completed = pyqtSignal(object, object)
+    request_failed = pyqtSignal(object, str)
     failed = pyqtSignal(str)
 
     def __init__(
@@ -37,6 +41,7 @@ class ClientWorker(QThread):
         self._client: ApiClient | None = None
         self._websocket: WebSocketClient | None = None
         self._closed = False
+        self._owned_jobs: dict[UUID, UUID] = {}
 
     def run(self) -> None:
         asyncio.set_event_loop(self._loop)
@@ -87,7 +92,7 @@ class ClientWorker(QThread):
         self,
         method: str,
         path: str,
-        response_type: type[SchemaModel],
+        response_type: type[BaseModel],
         body: SchemaModel | None,
         request_id: UUID,
         headers: Mapping[str, str] | None,
@@ -98,17 +103,25 @@ class ClientWorker(QThread):
             response = await self._client.request(
                 method, path, response_type, body, request_id=request_id, headers=headers
             )
+            if isinstance(response, ToolJob):
+                self._owned_jobs[response.id] = response.workspace_id
+            elif method == "DELETE" and path.startswith("/api/v1/jobs/"):
+                self._owned_jobs.pop(UUID(path.split("/")[-1].split("?")[0]), None)
             self.mutation_completed.emit(request_id, response)
         except asyncio.CancelledError:
             raise
+        except ApiError as exc:
+            self.request_failed.emit(request_id, str(exc))
+            self.failed.emit(str(exc))
         except Exception as exc:
+            self.request_failed.emit(request_id, f"Backend action failed ({type(exc).__name__})")
             self.failed.emit(f"Backend action failed ({type(exc).__name__})")
 
     def run_mutation(
         self,
         method: str,
         path: str,
-        response_type: type[SchemaModel],
+        response_type: type[BaseModel],
         body: SchemaModel | None,
         request_id: UUID,
         headers: Mapping[str, str] | None,
@@ -120,6 +133,62 @@ class ClientWorker(QThread):
             self._mutation(method, path, response_type, body, request_id, headers), self._loop
         )
 
+    def run_get(self, path: str, response_type: type[BaseModel], request_id: UUID) -> Future[None]:
+        return self.run_mutation("GET", path, response_type, None, request_id, None)
+
+    async def _upload(
+        self,
+        path: str,
+        response_type: type[BaseModel],
+        body: SchemaModel,
+        filename: str,
+        request_id: UUID,
+    ) -> None:
+        try:
+            if self._client is None:
+                raise RuntimeError("API client has not started")
+
+            def read() -> bytes:
+                if not Path(filename).is_file():
+                    raise FileNotFoundError("Choose a readable regular file.")
+                with Path(filename).open("rb") as source:
+                    return source.read(MAX_UPLOAD_BYTES + 1)
+
+            content = await asyncio.to_thread(read)
+            response = await self._client.upload(
+                path, response_type, body, content, Path(filename).name, request_id=request_id
+            )
+            if isinstance(response, ToolJob):
+                self._owned_jobs[response.id] = response.workspace_id
+            self.mutation_completed.emit(request_id, response)
+        except asyncio.CancelledError:
+            raise
+        except ApiError as exc:
+            self.request_failed.emit(request_id, str(exc))
+            self.failed.emit(str(exc))
+        except OSError:
+            self.request_failed.emit(
+                request_id, "Selected file could not be read. Choose a readable regular file."
+            )
+            self.failed.emit("Selected file could not be read. Choose a readable regular file.")
+        except Exception as exc:
+            self.request_failed.emit(request_id, f"Backend upload failed ({type(exc).__name__})")
+            self.failed.emit(f"Backend upload failed ({type(exc).__name__})")
+
+    def run_upload(
+        self,
+        path: str,
+        response_type: type[BaseModel],
+        body: SchemaModel,
+        filename: str,
+        request_id: UUID,
+    ) -> Future[None]:
+        if self._closed:
+            raise RuntimeError("Client worker is closed")
+        return asyncio.run_coroutine_threadsafe(
+            self._upload(path, response_type, body, filename, request_id), self._loop
+        )
+
     async def _shutdown(self) -> None:
         current = asyncio.current_task()
         pending = [task for task in asyncio.all_tasks() if task is not current]
@@ -128,6 +197,30 @@ class ClientWorker(QThread):
         await asyncio.gather(*pending, return_exceptions=True)
         if self._client is not None:
             await self._client.close()
+
+    async def clear_owned_jobs(self) -> None:
+        """Drain submissions, then erase every job created/observed by this tool client."""
+        current = asyncio.current_task()
+        pending = [task for task in asyncio.all_tasks() if task is not current]
+        # No stream is required for tool polling; leave optional event readers to shutdown.
+        actions = [
+            task
+            for task in pending
+            if getattr(task.get_coro(), "__name__", "") in ("_mutation", "_upload")
+        ]
+        await asyncio.gather(*actions, return_exceptions=True)
+        if self._client is not None:
+            for job_id, workspace_id in tuple(self._owned_jobs.items()):
+                try:
+                    await self._client.request(
+                        "DELETE",
+                        f"/api/v1/jobs/{job_id}?workspace_id={workspace_id}",
+                        EmptyResponse,
+                        request_id=uuid4(),
+                    )
+                except ApiError:
+                    pass  # Already cleared jobs return 404; remaining shutdown still proceeds.
+        self._owned_jobs.clear()
 
     def close(self) -> None:
         """Cancel work, close sockets, stop the loop and join the owned thread."""
@@ -145,6 +238,7 @@ class BaseViewModel(QObject):
     health_changed = pyqtSignal(object)
     message_received = pyqtSignal(object)
     mutation_completed = pyqtSignal(object, object)
+    request_failed = pyqtSignal(object, str)
     error_changed = pyqtSignal(str)
 
     def __init__(
@@ -163,6 +257,7 @@ class BaseViewModel(QObject):
         self._worker.health_received.connect(self._accept_health)
         self._worker.message_received.connect(self._accept_message)
         self._worker.mutation_completed.connect(self._accept_mutation)
+        self._worker.request_failed.connect(self.request_failed)
         self._worker.failed.connect(self.error_changed)
         self._worker.start()
 
@@ -190,7 +285,7 @@ class BaseViewModel(QObject):
 
     @pyqtSlot(object, object)
     def _accept_mutation(self, request_id: object, response: object) -> None:
-        if not isinstance(request_id, UUID) or not isinstance(response, SchemaModel):
+        if not isinstance(request_id, UUID) or not isinstance(response, BaseModel):
             raise TypeError("Worker delivered an invalid action result")
         self.mutation_completed.emit(request_id, response)
 
@@ -198,7 +293,7 @@ class BaseViewModel(QObject):
         self,
         method: str,
         path: str,
-        response_type: type[SchemaModel],
+        response_type: type[BaseModel],
         body: SchemaModel | None = None,
         *,
         headers: Mapping[str, str] | None = None,
@@ -215,6 +310,18 @@ class BaseViewModel(QObject):
             request_id,
             dict(headers) if headers else None,
         )
+        return request_id
+
+    def run_get(self, path: str, response_type: type[BaseModel]) -> UUID:
+        request_id = uuid4()
+        self._worker.run_get(path, response_type, request_id)
+        return request_id
+
+    def run_upload(
+        self, path: str, response_type: type[BaseModel], body: SchemaModel, filename: str
+    ) -> UUID:
+        request_id = uuid4()
+        self._worker.run_upload(path, response_type, body, filename, request_id)
         return request_id
 
     @property

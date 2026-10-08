@@ -1,10 +1,11 @@
-from collections import Counter, deque
-from dataclasses import dataclass
 import math
 import statistics
+from collections import Counter, deque
+from dataclasses import dataclass
 
 from toolkit.core import ModuleSpec
-from toolkit.tasks import TaskContext
+from toolkit.task_context import TaskContext
+from toolkit.traffic import TrafficEvent
 
 
 @dataclass(frozen=True)
@@ -33,13 +34,19 @@ def _score(value, history):
     return mean, (value - mean) / deviation
 
 
-def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=None):
+def detect_anomalies(
+    events: list[TrafficEvent],
+    bin_seconds: int = 1,
+    baseline_bins: int = 30,
+    threshold: float = 3,
+    task: TaskContext | None = None,
+) -> AnomalyReport:
     if type(bin_seconds) is not int or not 1 <= bin_seconds <= 3600:
-        raise ValueError('Bin size must be an integer from 1 to 3600 seconds.')
+        raise ValueError("Bin size must be an integer from 1 to 3600 seconds.")
     if type(baseline_bins) is not int or not 2 <= baseline_bins <= 120:
-        raise ValueError('Baseline must contain 2 to 120 bins.')
+        raise ValueError("Baseline must contain 2 to 120 bins.")
     if not math.isfinite(threshold) or threshold <= 0:
-        raise ValueError('Z-score threshold must be positive and finite.')
+        raise ValueError("Z-score threshold must be positive and finite.")
     task = task or TaskContext()
     if not events:
         return AnomalyReport([], False, 0)
@@ -50,30 +57,36 @@ def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=
         bucket = math.floor(event.timestamp / bin_seconds)
         protocol_names.add(event.protocol)
         if len(protocol_names) > 64:
-            raise ValueError('More than 64 protocol labels. Group uncommon protocols before analysis.')
+            raise ValueError(
+                "More than 64 protocol labels. Group uncommon protocols before analysis."
+            )
         size, protocols = bins.setdefault(bucket, [0, Counter()])
         bins[bucket][0] = size + event.bytes
         protocols[event.protocol] += 1
     first, last = min(bins), max(bins)
     if last - first + 1 > 100000:
-        raise ValueError('Time span exceeds 100,000 bins. Increase bin size or split the file.')
+        raise ValueError("Time span exceeds 100,000 bins. Increase bin size or split the file.")
     history = deque(maxlen=baseline_bins)
     findings, examined, total_findings = [], 0, 0
     for bucket in range(first, last + 1):
         task.check()
         size, counts = bins.get(bucket, (0, Counter()))
         total = sum(counts.values())
-        proportions = {protocol: count / total for protocol, count in counts.items()} if total else {}
+        proportions = (
+            {protocol: count / total for protocol, count in counts.items()} if total else {}
+        )
         if len(history) == baseline_bins:
             examined += 1
             protocols = set(proportions).union(*(item[2] for item in history))
 
             def metrics():
-                yield 'Bytes', size, [item[0] for item in history]
-                yield 'Events', total, [item[1] for item in history]
+                yield "Bytes", size, [item[0] for item in history]
+                yield "Events", total, [item[1] for item in history]
                 for protocol in sorted(protocols):
                     task.check()
-                    yield 'Protocol ' + protocol, proportions.get(protocol, 0), [item[2].get(protocol, 0) for item in history]
+                    yield "Protocol " + protocol, proportions.get(protocol, 0), [
+                        item[2].get(protocol, 0) for item in history
+                    ]
 
             for metric, value, previous in metrics():
                 task.check()
@@ -87,63 +100,13 @@ def detect_anomalies(events, bin_seconds=1, baseline_bins=30, threshold=3, task=
 
 
 def readiness():
-    try:
-        import scapy
-    except ImportError:
-        return 'CSV/log ready; install Scapy for saved PCAP files.'
-    return ''
+    return "CSV/log ready; saved captures require the separate PCAP worker."
 
 
 def create_panel(context):
-    from PySide6.QtWidgets import QDoubleSpinBox, QHBoxLayout, QLabel, QSpinBox
-    from toolkit.traffic import input_summary, read_traffic, utc_label
-    from toolkit.widgets import FileInput, TaskPanel, fill_table, make_table
+    from frontend.views.tools import create_panel as factory
 
-    panel = TaskPanel(context, 'Network Anomaly Detector',
-                      'Compare byte volume, event counts, and protocol proportions with preceding bins. '
-                      'Empty bins count as zero. Zero variance with a changed value is shown as infinite z. '
-                      'Anomalies are clues for investigation, not proof of malicious activity.')
-    source = FileInput('Traffic files (*.log *.txt *.csv *.pcap *.pcapng);;All files (*)')
-    panel.layout.addWidget(source)
-    controls = QHBoxLayout()
-    interval, baseline, threshold = QSpinBox(), QSpinBox(), QDoubleSpinBox()
-    interval.setRange(1, 3600)
-    interval.setValue(1)
-    baseline.setRange(2, 120)
-    baseline.setValue(30)
-    threshold.setRange(0.1, 20)
-    threshold.setValue(3)
-    for label, control in [('Bin seconds', interval), ('Baseline bins', baseline), ('Z threshold', threshold)]:
-        controls.addWidget(QLabel(label))
-        controls.addWidget(control)
-    controls.addStretch()
-    panel.layout.addLayout(controls)
-    results = make_table(['Bin start (UTC)', 'Metric', 'Value', 'Baseline mean', 'Z-score'])
-    panel.layout.addWidget(results, 1)
-    panel.add_footer()
-
-    def run():
-        filename = source.path.text()
-        options = interval.value(), baseline.value(), threshold.value()
-        fill_table(results, [])
-
-        def work(task):
-            data = read_traffic(filename, require_volume=True, task=task)
-            return data, detect_anomalies(data.events, *options, task=task)
-
-        def done(result):
-            data, report = result
-            fill_table(results, ((utc_label(a.bin_start), a.metric, f'{a.value:.4g}', f'{a.baseline:.4g}',
-                                  f'{a.zscore:.3g}') for a in report.anomalies))
-            state = f'{report.total:,} anomalies in {report.examined:,} evaluated bins; retained/displayed at most 5,000.'
-            if not report.sufficient:
-                state = f'Insufficient baseline data: need at least {options[1] + 1} bins.'
-            panel.status.setText(input_summary(data) + '\n' + state)
-
-        panel.start(work, done)
-
-    panel.run_button.clicked.connect(run)
-    return panel
+    return factory(MODULE.id, context)
 
 
-MODULE = ModuleSpec('anomaly-detector', 'Network Anomaly Detector', 60, create_panel)
+MODULE = ModuleSpec("anomaly-detector", "Network Anomaly Detector", 60, create_panel)

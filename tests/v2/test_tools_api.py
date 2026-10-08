@@ -292,6 +292,57 @@ async def test_multipart_larger_than_spool_threshold_never_rolls_to_disk(
     assert parsed == [False]
 
 
+@pytest.mark.parametrize("invalid", ["missing-boundary", "second-file"])
+async def test_invalid_multipart_rejected_without_job_or_lease(
+    tmp_path: Path, monkeypatch, invalid: str
+):
+    from backend.routers.tools import RAMMultipart
+
+    buffers = []
+    original = RAMMultipart.parse
+
+    async def observe(self):
+        try:
+            return await original(self)
+        finally:
+            buffers.extend(self._files_to_close_on_error)
+
+    monkeypatch.setattr(RAMMultipart, "parse", observe)
+    app = create_app(TOKEN, "invalid-upload", tmp_path)
+    async with app.router.lifespan_context(app):
+        workspace_id = app.state.workspaces.active_id
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(app=app, raise_app_exceptions=False),
+            base_url="https://127.0.0.1",
+            headers=AUTH,
+        ) as client:
+            headers = {"X-Request-ID": str(uuid4())}
+            if invalid == "missing-boundary":
+                headers["Content-Type"] = "multipart/form-data"
+                reply = await client.post(
+                    "/api/v1/tools/dos-detector/upload",
+                    headers=headers,
+                    content=b"sensitive-upload-sentinel",
+                )
+            else:
+                reply = await client.post(
+                    "/api/v1/tools/dos-detector/upload",
+                    headers=headers,
+                    data={"options": '{"kind":"dos-detector"}'},
+                    files=[
+                        ("file", ("first.csv", b"sensitive-upload-sentinel")),
+                        ("file", ("second.csv", b"second")),
+                    ],
+                )
+            assert reply.status_code in (400, 422)
+            assert "multipart" in reply.json()["detail"].lower()
+            assert "sensitive-upload-sentinel" not in reply.text
+            assert not app.state.jobs.records
+            assert app.state.workspaces._engines[workspace_id].references == 0
+    assert all(buffer.closed for buffer in buffers)
+    assert bool(buffers) == (invalid == "second-file")
+
+
 async def test_analyzer_import_failure_does_not_prevent_other_tools_starting(
     tmp_path: Path, monkeypatch
 ):

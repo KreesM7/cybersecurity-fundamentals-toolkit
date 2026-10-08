@@ -160,6 +160,41 @@ class GuiTests(unittest.TestCase):
         self.assertIsNone(panel.discovery_id)
         self.assertFalse(panel.test_button.isEnabled())
 
+    def test_sql_oversized_edit_reports_limit_without_submission(self):
+        panel = self.window.panels["sql-checker"]
+        panel.show_result(
+            {
+                "discovery_id": "00000000-0000-4000-8000-000000000001",
+                "generation": panel.target_generation,
+                "source_url": panel.url.text(),
+                "forms": [
+                    {
+                        "action": panel.url.text(),
+                        "method": "GET",
+                        "fields": [{"name": "query", "value": "original"}],
+                        "probe_indices": [0],
+                    }
+                ],
+            }
+        )
+        panel.owned.setChecked(True)
+        edited = "sensitive-edit-sentinel" + "x" * (65537 - 23)
+        self.assertEqual(len(edited), 65537)
+        panel.fields.item(0, 1).setText(edited)
+        discovery_id = panel.discovery_id
+        pending = dict(self.vm._pending)
+
+        panel.test_selected()
+
+        self.assertIn("65,536", panel.status.text())
+        self.assertNotIn("sensitive-edit-sentinel", panel.status.text())
+        self.assertEqual(self.vm._pending, pending)
+        self.assertFalse(self.backend.instance.server.config.app.state.jobs.records)
+        self.assertEqual(panel.discovery_id, discovery_id)
+        self.assertEqual(panel.fields.item(0, 1).text(), edited)
+        self.assertEqual(panel.forms.count(), 1)
+        self.assertTrue(panel.test_button.isEnabled())
+
     def test_shutdown_erases_a_submission_before_queued_gui_signal_delivery(self):
         panel = self.window.panels["caesar"]
         panel.source.setPlainText("Close immediately")

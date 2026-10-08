@@ -7,7 +7,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, HTTPException, Request
 from starlette.datastructures import UploadFile
-from starlette.formparsers import MultiPartParser
+from starlette.formparsers import MultiPartException, MultiPartParser
 
 from backend.jobs import JobSnapshot
 from backend.services.tool_service import MAX_FILE_BYTES, ToolService
@@ -84,7 +84,13 @@ async def upload(tool_id: str, request: Request, request_id: RequestID) -> JobSn
     parser = RAMMultipart(
         request.headers, request.stream(), max_files=1, max_fields=1, max_part_size=1024 * 1024
     )
-    form = await parser.parse()
+    try:
+        form = await parser.parse()
+    except MultiPartException as exc:
+        # The parser closes any partial upload buffers before propagating errors.
+        raise HTTPException(
+            422, detail="Invalid multipart upload. Send one file and one JSON options field."
+        ) from exc
     try:
         file, raw_options = form.get("file"), form.get("options")
         if not isinstance(file, UploadFile) or not isinstance(raw_options, str):

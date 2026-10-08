@@ -108,21 +108,27 @@ class Panel(ToolPanel):
             return
         index = self.forms.currentIndex()
         form = self.discovered_forms[index]
-        fields = []
-        for row, field in enumerate(form.fields):
-            item = self.fields.item(row, 1)
-            fields.append(SQLField(name=field.name, value=item.text() if item else ""))
-        options = SQLOptions(
-            operation="test",
-            url=self.source_url,
-            owned=self.owned.isChecked(),
-            allow_post=self.post.isChecked(),
-            generation=self.target_generation,
-            discovery_id=self.discovery_id,
-            form_index=index,
-            fields=fields,
-        )
-        self.vm.submit(options)
+        try:
+            fields = []
+            for row, field in enumerate(form.fields):
+                item = self.fields.item(row, 1)
+                fields.append(SQLField(name=field.name, value=item.text() if item else ""))
+            options = SQLOptions(
+                operation="test",
+                url=self.source_url,
+                owned=self.owned.isChecked(),
+                allow_post=self.post.isChecked(),
+                generation=self.target_generation,
+                discovery_id=self.discovery_id,
+                form_index=index,
+                fields=fields,
+            )
+            self.vm.submit(options)
+        except ValueError:
+            self.status.setText(
+                "Check required fields and input limits (65,536 characters per field value)."
+            )
+            return
         self.output.clear()
         self.status.setText("Testing selected form…")
 

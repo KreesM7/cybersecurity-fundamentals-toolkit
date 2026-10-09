@@ -33,10 +33,14 @@ class FileReport:
 
 
 def _database() -> str | None:
-    from backend.platform_utils import magic_database
+    from backend.platform_utils import is_windows, magic_database
 
     try:
         filename = magic_database()
+        if is_windows() and filename is None:
+            raise ValueError(
+                "Set TOOLKIT_MAGIC_FILE to your compatible Windows magic.mgc database."
+            )
     except ValueError as exc:
         raise RuntimeError(str(exc)) from exc
     return str(filename) if filename else None
@@ -101,11 +105,8 @@ def identify_file(filename: str | Path, task: TaskContext | None = None) -> File
 def identify_bytes(content: bytes, filename: str, task: TaskContext) -> FileReport:
     """Identify upload bytes; filenames affect only the extension comparison."""
     task.check()
-    from backend.platform_utils import magic_database
-
     sample = content[:SAMPLE_BYTES]
-    database_path = magic_database()
-    database = str(database_path) if database_path else None
+    database = _database()
     try:
         import magic
 

@@ -163,6 +163,8 @@ def _reject_links(path: Path) -> None:
 
 
 def _windows_sid() -> str:
+    if sys.platform != "win32":
+        raise OSError("Windows security API is unavailable on this platform")
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     security = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel.GetCurrentProcess.restype = wintypes.HANDLE
@@ -195,6 +197,8 @@ def _windows_sid() -> str:
 
 
 def _sid_string(sid: ctypes.c_void_p) -> str:
+    if sys.platform != "win32":
+        raise OSError("Windows security API is unavailable on this platform")
     security = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     security.ConvertSidToStringSidW.argtypes = [ctypes.c_void_p, ctypes.POINTER(wintypes.LPWSTR)]
@@ -211,6 +215,8 @@ def _sid_string(sid: ctypes.c_void_p) -> str:
 
 
 def _protect_windows(path: Path) -> None:
+    if sys.platform != "win32":
+        raise OSError("Windows security API is unavailable on this platform")
     security = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     security.ConvertStringSecurityDescriptorToSecurityDescriptorW.argtypes = [
@@ -246,6 +252,8 @@ class _Acl(ctypes.Structure):
 
 
 def _assert_windows_private(path: Path) -> None:
+    if sys.platform != "win32":
+        raise OSError("Windows security API is unavailable on this platform")
     security = ctypes.WinDLL("advapi32", use_last_error=True)
     kernel = ctypes.WinDLL("kernel32", use_last_error=True)
     security.GetNamedSecurityInfoW.argtypes = [
@@ -400,7 +408,7 @@ def acquire_profile_lease(profile: Path) -> ProfileLease:
     try:
         if not existed:
             protect_private_path(guard)
-        if is_windows():
+        if sys.platform == "win32":
             import msvcrt
 
             if guard.stat().st_size == 0:

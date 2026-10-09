@@ -1,6 +1,7 @@
 """One PyQt6 runtime, authenticated TLS backend bootstrap and orderly ownership."""
 
 import argparse
+import json
 import os
 import sys
 import tempfile
@@ -23,6 +24,7 @@ def main(argv: list[str] | None = None) -> int:
     parser = argparse.ArgumentParser(description="Cybersecurity Fundamentals Toolkit desktop")
     parser.add_argument("--profile", type=Path)
     parser.add_argument("--self-test", action="store_true")
+    parser.add_argument("--self-test-report", type=Path)
     args = parser.parse_args(argv)
     temporary = tempfile.TemporaryDirectory() if args.self_test and args.profile is None else None
     profile = args.profile or (Path(temporary.name) if temporary else get_config_dir())
@@ -45,6 +47,10 @@ def main(argv: list[str] | None = None) -> int:
         result = 2
         launcher.setText(message)
         if args.self_test:
+            if args.self_test_report:
+                args.self_test_report.write_text(
+                    json.dumps({"ok": False, "message": message}), "utf-8"
+                )
             application.exit(result)
 
     def ready(locator: object, material: object, owned: bool) -> None:
@@ -73,6 +79,10 @@ def main(argv: list[str] | None = None) -> int:
                     return
                 for index in range(window.stack.count()):
                     window.stack.setCurrentIndex(index)
+                if args.self_test_report:
+                    args.self_test_report.write_text(
+                        json.dumps({"ok": True, "panels": window.stack.count()}), "utf-8"
+                    )
                 window.close()
                 application.exit(0)
 

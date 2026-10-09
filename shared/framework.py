@@ -3,7 +3,7 @@
 import ipaddress
 from typing import Literal
 
-from pydantic import Field, SecretStr, field_validator
+from pydantic import Field, JsonValue, SecretStr, field_validator
 
 from shared.schemas import SchemaModel
 
@@ -15,6 +15,11 @@ class RpcConnect(SchemaModel):
     password: SecretStr | None = None
     ca_pem: str = Field(min_length=1, max_length=32768)
     remember_password: bool = False
+
+    def transport_dump(self) -> dict[str, JsonValue]:
+        payload = self.model_dump(mode="json")
+        payload["password"] = self.password.get_secret_value() if self.password else None
+        return payload
 
     @field_validator("host")
     @classmethod
@@ -44,3 +49,7 @@ class ConnectionStatus(SchemaModel):
 
 class Confirmation(SchemaModel):
     confirmed: bool = False
+
+
+class ShutdownCheck(SchemaModel):
+    confirmation_required: bool

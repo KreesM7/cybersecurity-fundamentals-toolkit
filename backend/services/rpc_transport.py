@@ -176,6 +176,8 @@ class RpcTransport:
                 body.extend(chunk)
         try:
             value = _json.validate_python(_text_values(decode(bytes(body))))
+            if method == "module.search" and isinstance(value, list):
+                value = {"modules": value}
             if not isinstance(value, dict):
                 raise ValueError("Expected response object")
         except Exception as exc:

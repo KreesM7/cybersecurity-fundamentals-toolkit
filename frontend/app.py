@@ -15,7 +15,7 @@ from backend.tls import TLSMaterial
 from frontend.main_window import MainWindow
 from frontend.runtime import BackendThread
 from frontend.theme import apply_theme
-from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.tools.base import ToolPanel
 
 
@@ -37,7 +37,7 @@ def main(argv: list[str] | None = None) -> int:
     launcher.show()
     backend = BackendThread(profile)
     windows: list[MainWindow] = []
-    models: list[ToolsViewModel] = []
+    models: list[AppViewModel] = []
     result = 0
 
     def failed(message: str) -> None:
@@ -51,7 +51,7 @@ def main(argv: list[str] | None = None) -> int:
         if not isinstance(locator, InstanceLocator) or not isinstance(material, TLSMaterial):
             failed("Invalid backend startup result. Restart the application.")
             return
-        model = ToolsViewModel(
+        model = AppViewModel(
             f"https://127.0.0.1:{locator.port}",
             material.client_context(),
             locator.token.get_secret_value(),

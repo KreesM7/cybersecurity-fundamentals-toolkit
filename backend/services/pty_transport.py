@@ -134,6 +134,8 @@ class PtyTransport:
                                 "Framework rejected the operation; execution may be uncertain."
                             )
                         data = record.get("data")
+                        if method == "module.search" and isinstance(data, list):
+                            data = {"modules": data}
                         if not isinstance(data, dict):
                             raise ValueError("Invalid structured reply")
                         return data

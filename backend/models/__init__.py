@@ -126,6 +126,8 @@ class JobAssociation(WorkspaceBase):
         ForeignKey("framework_instances.id"), index=True
     )
     module_id: Mapped[str] = mapped_column(String(200))
+    remote_job_id: Mapped[str | None] = mapped_column(String(20))
+    execution_id: Mapped[str | None] = mapped_column(String(64))
     status: Mapped[str] = mapped_column(String(24))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     target: Mapped[Target | None] = relationship(back_populates="jobs")

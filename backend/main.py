@@ -25,7 +25,8 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.request_limits import RequestBodyLimit
-from backend.routers import connection, targets, tools, workspaces
+from backend.routers import connection, modules, targets, tools, workspaces
+from backend.services.module_service import ModuleService
 from backend.services.metasploit_service import MetasploitService
 from backend.services.rpc_transport import RpcFailure
 from backend.services.tool_service import ToolService
@@ -82,6 +83,7 @@ def create_app(
             )
             tool_service = ToolService(service, jobs)
             app.state.tools = tool_service
+            app.state.modules = ModuleService(service, framework, hub, app.state.mutations)
             yield
         finally:
             try:
@@ -122,6 +124,7 @@ def create_app(
     app.include_router(targets.router, prefix="/api/v1")
     app.include_router(tools.router, prefix="/api/v1")
     app.include_router(connection.router, prefix="/api/v1")
+    app.include_router(modules.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

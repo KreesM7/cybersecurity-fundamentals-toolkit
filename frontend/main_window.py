@@ -8,15 +8,20 @@ from PyQt6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMessageBox,
     QPushButton,
     QStackedWidget,
     QVBoxLayout,
     QWidget,
 )
 
+from frontend.viewmodels.app_vm import AppViewModel
 from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.views.connection import ConnectionPanel
+from frontend.views.modules import ModuleBrowser
 from frontend.views.tools import PANELS, create_panel
+from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
 from shared.tools import ToolView
 
@@ -27,6 +32,8 @@ class MainWindow(QMainWindow):
     def __init__(self, view_model: BaseViewModel) -> None:
         super().__init__()
         self._vm = view_model
+        self._closing = False
+        self._checking_close = False
         self.setWindowTitle("Cybersecurity Fundamentals Toolkit")
         self.resize(1100, 740)
         central = QWidget()
@@ -34,7 +41,7 @@ class MainWindow(QMainWindow):
         self.sidebar = QListWidget()
         self.sidebar.setMaximumWidth(250)
         self.sidebar.addItem("Dashboard")
-        for title in ("Workspaces", "Modules", "Jobs", "Artifacts", "Settings"):
+        for title in ("Workspaces", "Jobs", "Artifacts"):
             item = QListWidgetItem(title)
             item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
             self.sidebar.addItem(item)
@@ -73,6 +80,12 @@ class MainWindow(QMainWindow):
                 self.panels[tool_id] = panel
                 self.register_view(title, panel)
             view_model.tools_changed.connect(self._show_tools)
+        if isinstance(view_model, AppViewModel):
+            self.register_view("Modules", ModuleBrowser(view_model))
+            self.register_view("Settings", ConnectionPanel(view_model))
+            view_model.state_changed.connect(self._shutdown_result)
+            view_model.action_error.connect(self._shutdown_error)
+            view_model.watch_events("/ws/events")
 
     def _show_tools(self, values: object) -> None:
         if isinstance(values, list):
@@ -106,6 +119,41 @@ class MainWindow(QMainWindow):
             self.stack.setCurrentIndex(index if isinstance(index, int) else 0)
 
     def closeEvent(self, event: QCloseEvent | None) -> None:  # noqa: N802 - Qt override
+        if isinstance(self._vm, AppViewModel) and not self._closing:
+            if event is not None:
+                event.ignore()
+            if not self._checking_close:
+                self._checking_close = True
+                self._vm.get("shutdown-check", "/api/v1/connection/shutdown-check", ShutdownCheck)
+            return
         self._vm.close()
         if event is not None:
             event.accept()
+
+    def _shutdown_result(self, key: str, value: object) -> None:
+        if key == "shutdown-check" and isinstance(value, ShutdownCheck):
+            self._checking_close = False
+            if value.confirmation_required and not self._confirm_shutdown():
+                return
+            self._closing = True
+            self.close()
+
+    def _confirm_shutdown(self) -> bool:
+        return (
+            QMessageBox.question(
+                self,
+                "Stop owned activity?",
+                "Closing will stop active or uncertain sessions and jobs in the app's "
+                "owned Metasploit console. Close now?",
+                QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
+                QMessageBox.StandardButton.No,
+            )
+            == QMessageBox.StandardButton.Yes
+        )
+
+    def _shutdown_error(self, key: str, message: str) -> None:
+        if key == "shutdown-check":
+            self._checking_close = False
+            if self._confirm_shutdown():
+                self._closing = True
+                self.close()

@@ -18,10 +18,12 @@ from PyQt6.QtWidgets import (
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.views.activity import ActivityPanel
 from frontend.views.connection import ConnectionPanel
 from frontend.views.modules import ModuleBrowser
 from frontend.views.payloads import PayloadPanel
 from frontend.views.tools import PANELS, create_panel
+from frontend.views.workspaces import ArtifactsPanel, TargetsPanel, WorkspacePanel
 from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
 from shared.tools import ToolView
@@ -42,10 +44,6 @@ class MainWindow(QMainWindow):
         self.sidebar = QListWidget()
         self.sidebar.setMaximumWidth(250)
         self.sidebar.addItem("Dashboard")
-        for title in ("Workspaces", "Jobs", "Artifacts"):
-            item = QListWidgetItem(title)
-            item.setFlags(item.flags() & ~Qt.ItemFlag.ItemIsEnabled)
-            self.sidebar.addItem(item)
         self.stack = QStackedWidget()
         dashboard = QWidget()
         content = QVBoxLayout(dashboard)
@@ -82,8 +80,12 @@ class MainWindow(QMainWindow):
                 self.register_view(title, panel)
             view_model.tools_changed.connect(self._show_tools)
         if isinstance(view_model, AppViewModel):
+            self.register_view("Workspaces", WorkspacePanel(view_model))
+            self.register_view("Targets", TargetsPanel(view_model))
             self.register_view("Modules", ModuleBrowser(view_model))
             self.register_view("Payloads", PayloadPanel(view_model))
+            self.register_view("Sessions / Jobs / Console", ActivityPanel(view_model))
+            self.register_view("Artifacts", ArtifactsPanel(view_model))
             self.register_view("Settings", ConnectionPanel(view_model))
             view_model.state_changed.connect(self._shutdown_result)
             view_model.action_error.connect(self._shutdown_error)

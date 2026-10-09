@@ -72,15 +72,21 @@ class ClientWorker(QThread):
         return asyncio.run_coroutine_threadsafe(self._health(), self._loop)
 
     async def _watch(self, path: str) -> None:
-        try:
-            if self._websocket is None:
-                raise RuntimeError("Websocket client has not started")
-            async for message in self._websocket.messages(path):
-                self.message_received.emit(message)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            self.failed.emit(f"Backend stream failed ({type(exc).__name__})")
+        delay = 1
+        while not self._closed:
+            try:
+                if self._websocket is None:
+                    raise RuntimeError("Websocket client has not started")
+                async for message in self._websocket.messages(path):
+                    delay = 1
+                    self.message_received.emit(message)
+            except asyncio.CancelledError:
+                raise
+            except Exception:
+                self.failed.emit("Live updates disconnected; reloading state and reconnecting.")
+            self.message_received.emit('{"topic":"resync"}')
+            await asyncio.sleep(delay)
+            delay = min(delay * 2, 30)
 
     def watch_events(self, path: str) -> Future[None]:
         """Consume a stream on the client loop without blocking Qt."""

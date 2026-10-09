@@ -1,13 +1,15 @@
 """Target endpoints capture active workspace IDs before mutation replay or async dispatch."""
 
 import hashlib
-from typing import Annotated, Literal
+from typing import Annotated, Literal, cast
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, File, Header, Query, Request, Response, UploadFile
 from pydantic import JsonValue
 
+from backend.services.artifact_service import ArtifactService
 from backend.services.target_service import MAX_XML_BYTES, TargetService
+from shared.payloads import ArtifactView
 from shared.workspaces import (
     TargetBulk,
     TargetCreate,
@@ -21,9 +23,9 @@ router = APIRouter(prefix="/targets", tags=["targets"])
 RequestID = Annotated[UUID, Header(alias="X-Request-ID")]
 
 
-def service(request: Request) -> TargetService:
+def service(request: Request, workspace_id: UUID | None = None) -> TargetService:
     workspaces = request.app.state.workspaces
-    return TargetService(workspaces, workspaces.active_id)
+    return TargetService(workspaces, workspace_id or workspaces.active_id)
 
 
 Service = Annotated[TargetService, Depends(service)]
@@ -92,6 +94,28 @@ async def import_nmap(
 async def export(targets: Service, format: Literal["json", "csv", "nmap"] = "json") -> Response:
     data, media_type = await targets.export(format)
     return Response(data, media_type=media_type)
+
+
+@router.post("/export-artifact", response_model=ArtifactView)
+async def export_artifact(
+    request: Request,
+    request_id: RequestID,
+    targets: Service,
+    format: Literal["json", "csv", "nmap"] = "json",
+) -> ArtifactView:
+    async def action() -> ArtifactView:
+        data, media_type = await targets.export(format)
+        return await cast(ArtifactService, request.app.state.artifacts).create(
+            targets.workspace_id,
+            "targets." + ("xml" if format == "nmap" else format),
+            data.encode("utf-8"),
+            media_type,
+        )
+
+    value = await request.app.state.mutations.execute(
+        targets.workspace_id, request_id, "targets.export", {"format": format}, action
+    )
+    return ArtifactView.model_validate(value)
 
 
 @router.get("/{identifier}", response_model=TargetView)

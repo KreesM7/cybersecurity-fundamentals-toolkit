@@ -156,7 +156,7 @@ class PayloadPanel(QWidget):
                 "generator-cancel",
                 "POST",
                 f"/api/v1/jobs/{self.job.id}/cancel?workspace_id={self.job.workspace_id}",
-                ToolJob,
+                EmptyResponse,
             )
 
     def save_as(self) -> None:

@@ -157,3 +157,38 @@ def test_payload_controls_and_generation_request():
     panel.timer.stop()
     panel.deleteLater()
     app.processEvents()
+
+
+def test_workspace_target_and_terminal_widgets_use_captured_ids():
+    from frontend.views.activity import ActivityPanel
+    from frontend.views.workspaces import WorkspacePanel, TargetsPanel
+    from shared.activity import ConsoleHandle, TerminalOutput
+
+    app = QApplication.instance() or QApplication([])
+    vm = ViewModelFixture()
+    targets = TargetsPanel(vm)
+    targets.address.setText("127.0.0.1")
+    targets.hostname.setText("fixture")
+    targets.save()
+    assert str(vm.workspace_id) in vm.calls[-1][1][2]
+    assert str(vm.calls[-1][1][-1].address) == "127.0.0.1"
+    workspaces = WorkspacePanel(vm)
+    workspaces.notes.setPlainText("fixture notes")
+    workspaces.save_notes()
+    assert vm.calls[-1][1][-1].notes == "fixture notes"
+    activity = ActivityPanel(vm)
+    handle = ConsoleHandle(workspace_id=vm.workspace_id, framework_id=uuid4(), remote_id="0")
+    activity.update_state("terminal-open", handle)
+    activity.command.setText("version")
+    activity.send()
+    assert vm.calls[-1][1][-1].framework_id == handle.framework_id
+    assert vm.calls[-1][1][-1].command.get_secret_value() == "version"
+    assert not activity.command.text()
+    activity.update_state("terminal-output", TerminalOutput(lines=["fixture"], sequence=1))
+    assert activity.output.toPlainText() == "fixture"
+    activity.update_state("workspace", uuid4())
+    assert activity.terminal is None and not activity.output.toPlainText()
+    activity.timer.stop()
+    for panel in (targets, workspaces, activity):
+        panel.deleteLater()
+    app.processEvents()

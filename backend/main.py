@@ -25,7 +25,8 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.request_limits import RequestBodyLimit
-from backend.routers import connection, modules, payloads, targets, tools, workspaces
+from backend.routers import activity, connection, modules, payloads, targets, tools, workspaces
+from backend.services.activity_service import ActivityService
 from backend.services.artifact_service import ArtifactService
 from backend.services.metasploit_service import MetasploitService
 from backend.services.module_service import ModuleService
@@ -86,6 +87,7 @@ def create_app(
             tool_service = ToolService(service, jobs)
             app.state.tools = tool_service
             app.state.modules = ModuleService(service, framework, hub, app.state.mutations)
+            app.state.activity = ActivityService(app.state.modules)
             app.state.artifacts = ArtifactService(service)
             app.state.payloads = PayloadService(
                 app.state.modules, app.state.artifacts, jobs, app.state.mutations
@@ -97,7 +99,11 @@ def create_app(
             finally:
                 try:
                     try:
-                        await framework.close()
+                        try:
+                            if hasattr(app.state, "activity"):
+                                await app.state.activity.close()
+                        finally:
+                            await framework.close()
                     finally:
                         if tool_service is not None:
                             await tool_service.close()
@@ -132,6 +138,7 @@ def create_app(
     app.include_router(connection.router, prefix="/api/v1")
     app.include_router(modules.router, prefix="/api/v1")
     app.include_router(payloads.router, prefix="/api/v1")
+    app.include_router(activity.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

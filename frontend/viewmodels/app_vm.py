@@ -39,6 +39,7 @@ class AppViewModel(ToolsViewModel):
         self.workspace_id: UUID | None = None
         self._actions: dict[UUID, str] = {}
         self._latest: dict[str, UUID] = {}
+        self._action_scopes: dict[UUID, UUID | None] = {}
         self.mutation_completed.connect(self._result)
         self.request_failed.connect(self._action_failed)
         self.message_received.connect(self._event)
@@ -47,6 +48,10 @@ class AppViewModel(ToolsViewModel):
         identifier = self.run_get(path, model)
         self._actions[identifier] = key
         self._latest[key] = identifier
+        self._action_scopes[identifier] = self.workspace_id
+
+    def invalidate(self, key: str) -> None:
+        self._latest[key] = uuid4()
 
     def mutate(
         self,
@@ -58,12 +63,20 @@ class AppViewModel(ToolsViewModel):
     ) -> None:
         identifier = self.run_mutation(method, path, model, body)
         self._actions[identifier] = key
+        self._action_scopes[identifier] = self.workspace_id
         # Mutations are never retried or discarded merely because another action follows.
 
     def _result(self, identifier: object, value: object) -> None:
         if not isinstance(identifier, UUID):
             return
         key = self._actions.pop(identifier, None)
+        scope = self._action_scopes.pop(identifier, None)
+        if (
+            key
+            and key.startswith(("activity", "terminal", "module", "targets", "target-", "notes"))
+            and scope != self.workspace_id
+        ):
+            return
         if key is None or (key in self._latest and self._latest[key] != identifier):
             return
         if key == "workspaces" and isinstance(value, RootModel):
@@ -76,6 +89,7 @@ class AppViewModel(ToolsViewModel):
     def _action_failed(self, identifier: object, message: str) -> None:
         if isinstance(identifier, UUID):
             key = self._actions.pop(identifier, None)
+            self._action_scopes.pop(identifier, None)
             if key:
                 self.action_error.emit(key, message)
 
@@ -89,7 +103,7 @@ class AppViewModel(ToolsViewModel):
         if not isinstance(event, dict):
             return
         self.state_changed.emit("event", event)
-        if event.get("topic") == "workspace-activated":
+        if event.get("topic") in {"workspace-activated", "resync"}:
             self.refresh_workspaces()
 
     def refresh_workspaces(self) -> None:
@@ -132,7 +146,12 @@ class AppViewModel(ToolsViewModel):
         self.mutate("module-launch", "POST", "/api/v1/modules/run", ModuleLaunch, value)
 
     def targets(self) -> None:
-        self.get("targets", "/api/v1/targets/", RootModel[list[TargetView]])
+        if self.workspace_id:
+            self.get(
+                "targets",
+                f"/api/v1/targets/?workspace_id={self.workspace_id}",
+                RootModel[list[TargetView]],
+            )
 
     def save_artifact(self, workspace_id: UUID, identifier: UUID, destination: str) -> None:
         request_id = uuid4()
@@ -143,7 +162,17 @@ class AppViewModel(ToolsViewModel):
             request_id,
         )
 
+    def upload_file(self, key: str, path: str, model: type[BaseModel], filename: str) -> None:
+        from shared.tools import EmptyResponse
+
+        identifier = self.run_upload(path, model, EmptyResponse(), filename)
+        self._actions[identifier] = key
+        self._action_scopes[identifier] = self.workspace_id
+
     def transfer_target(self, identifier: UUID) -> None:
         self.mutate(
-            "target-transfer", "POST", f"/api/v1/targets/{identifier}/use-as-rhosts", TargetTransfer
+            "target-transfer",
+            "POST",
+            f"/api/v1/targets/{identifier}/use-as-rhosts?workspace_id={self.workspace_id}",
+            TargetTransfer,
         )

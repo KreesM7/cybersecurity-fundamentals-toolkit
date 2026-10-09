@@ -2,6 +2,7 @@
 
 import asyncio
 import json
+import os
 import struct
 import sys
 from threading import Event
@@ -11,6 +12,21 @@ import pytest
 
 from backend.events import EventHub
 from backend.jobs import JobContext
+
+
+@pytest.fixture(autouse=True)
+def independent_ci_worker(monkeypatch):
+    """CI uses a separate native interpreter; real Windows WSL tests use the default host."""
+    executable = os.environ.get("TOOLKIT_TEST_WORKER")
+    if executable:
+        from backend.services import traffic_worker
+
+        monkeypatch.setattr(traffic_worker, "is_windows", lambda: False)
+        monkeypatch.setattr(
+            traffic_worker,
+            "capture_worker_argv",
+            lambda arguments: [executable, "-m", "toolkit_scapy_worker", *arguments],
+        )
 
 
 def packet(protocol=6, ipv6=False):

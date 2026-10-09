@@ -199,7 +199,9 @@ async def test_wss_client_uses_trusted_context_bearer_and_ignores_proxy(
                 if delivered:
                     break
                 await asyncio.sleep(0.01)
-            assert delivered == ["confirmed"]
+            assert delivered[0] == "confirmed"
+            # A normally closed read-only stream requests resynchronization before retry.
+            assert all(message in {"confirmed", '{"topic":"resync"}'} for message in delivered)
         finally:
             vm.close()
 

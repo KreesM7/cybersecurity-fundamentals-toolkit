@@ -229,13 +229,16 @@ def _protect_windows(path: Path) -> None:
     kernel.LocalFree.argtypes = [ctypes.c_void_p]
     descriptor = ctypes.c_void_p()
     flags = "OICI" if path.is_dir() else ""
-    sddl = f"D:P(A;{flags};FA;;;{_windows_sid()})"
+    sid = _windows_sid()
+    sddl = f"O:{sid}D:P(A;{flags};FA;;;{sid})"
     if not security.ConvertStringSecurityDescriptorToSecurityDescriptorW(
         sddl, 1, ctypes.byref(descriptor), None
     ):
         raise ctypes.WinError(ctypes.get_last_error())
     try:
-        if not security.SetFileSecurityW(str(path), 0x80000004, descriptor):
+        # Elevated Windows processes may create files owned by Administrators;
+        # set the current-user owner as well as the protected current-user DACL.
+        if not security.SetFileSecurityW(str(path), 0x80000005, descriptor):
             raise ctypes.WinError(ctypes.get_last_error())
     finally:
         kernel.LocalFree(descriptor)

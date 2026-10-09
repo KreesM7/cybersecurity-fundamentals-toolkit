@@ -9,6 +9,7 @@ coverage.xml
 *.egg-info/
 *.py[cod]
 .venv/
+.worker/
 build/
 dist/
 .env

@@ -182,6 +182,7 @@ def prepare_backend(profile: Path, *, lease: ProfileLease | None = None) -> Back
                 ssl_certfile=str(tls.server_cert),
                 ssl_keyfile=str(tls.server_key),
                 access_log=False,
+                log_config=None,
                 log_level="warning",
                 ws_max_size=65536,
                 ws_max_queue=16,

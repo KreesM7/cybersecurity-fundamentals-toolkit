@@ -1,6 +1,6 @@
 """Flat desktop dashboard; all service state arrives through the ViewModel."""
 
-from PyQt6.QtCore import Qt, pyqtSlot
+from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
     QDialog,
@@ -46,6 +46,7 @@ class MainWindow(QMainWindow):
         central = QWidget()
         layout = QHBoxLayout(central)
         self.sidebar = QListWidget()
+        self.sidebar.setMinimumWidth(230)
         self.sidebar.setMaximumWidth(250)
         self.sidebar.addItem("Dashboard")
         self.stack = QStackedWidget()
@@ -200,6 +201,8 @@ class MainWindow(QMainWindow):
                 self._checking_close = True
                 self._vm.get("shutdown-check", "/api/v1/connection/shutdown-check", ShutdownCheck)
             return
+        for timer in self.findChildren(QTimer):
+            timer.stop()
         self._vm.close()
         if event is not None:
             event.accept()

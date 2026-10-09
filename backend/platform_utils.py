@@ -110,6 +110,23 @@ def wsl_argv(args: Sequence[str]) -> list[str]:
     return ["wsl.exe", "--distribution", "Toolkit-MSF", "--exec", *args]
 
 
+def framework_host_argv(token: str, *, cancel: bool = False) -> list[str]:
+    """Invoke only the separately provisioned private framework host."""
+    import re
+
+    if not re.fullmatch(r"[a-f0-9]{32}", token):
+        raise ValueError("Invalid framework control token")
+    arguments = [
+        "/opt/toolkit-msf/venv/bin/python",
+        "/opt/toolkit-msf/pty-host.py",
+        "--token",
+        token,
+    ]
+    if cancel:
+        arguments.append("--cancel")
+    return wsl_argv(arguments) if is_windows() else arguments
+
+
 def capture_worker_argv(arguments: Sequence[str]) -> list[str]:
     """Invoke only the independently installed worker, never frozen application Python."""
     if is_windows():

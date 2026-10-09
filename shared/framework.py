@@ -39,6 +39,7 @@ class ConnectionStatus(SchemaModel):
     instance_id: str | None = None
     endpoint: str = ""
     message: str = "Connect to your dedicated Toolkit-MSF installation."
+    owned: bool = False
 
 
 class Confirmation(SchemaModel):

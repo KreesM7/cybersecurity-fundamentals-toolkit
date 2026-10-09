@@ -6,7 +6,7 @@ from uuid import UUID
 from fastapi import APIRouter, Header, Request
 
 from backend.services.metasploit_service import MetasploitService
-from shared.framework import ConnectionStatus, RpcConnect
+from shared.framework import Confirmation, ConnectionStatus, RpcConnect
 
 router = APIRouter(prefix="/connection", tags=["connection"])
 RequestID = Annotated[UUID, Header(alias="X-Request-ID")]
@@ -37,12 +37,37 @@ async def connect(data: RpcConnect, request: Request, request_id: RequestID) -> 
 
 
 @router.post("/disconnect", response_model=ConnectionStatus)
-async def disconnect(request: Request, request_id: RequestID) -> ConnectionStatus:
+async def disconnect(
+    request: Request, request_id: RequestID, data: Confirmation
+) -> ConnectionStatus:
+    async def action() -> ConnectionStatus:
+        return await service(request).disconnect(confirmed=data.confirmed)
+
     result = await request.app.state.mutations.execute(
         request.app.state.workspaces.active_id,
         request_id,
         "framework.disconnect",
-        {},
-        service(request).disconnect,
+        data.model_dump(mode="json"),
+        action,
+    )
+    return ConnectionStatus.model_validate(result)
+
+
+@router.get("/shutdown-check")
+async def shutdown_check(request: Request) -> dict[str, bool]:
+    return {"confirmation_required": await service(request).shutdown_check()}
+
+
+@router.post("/fallback", response_model=ConnectionStatus)
+async def fallback(data: Confirmation, request: Request, request_id: RequestID) -> ConnectionStatus:
+    async def action() -> ConnectionStatus:
+        return await service(request).connect_fallback(confirmed=data.confirmed)
+
+    result = await request.app.state.mutations.execute_external(
+        request.app.state.workspaces.active_id,
+        request_id,
+        "framework.fallback",
+        data.model_dump(mode="json"),
+        action,
     )
     return ConnectionStatus.model_validate(result)

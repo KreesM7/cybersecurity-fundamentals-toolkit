@@ -121,3 +121,26 @@ async def test_invalid_module_path_never_reaches_transport(tmp_path):
     with pytest.raises(RpcFailure):
         await service.get_sessions()
     await service.close()
+
+
+@pytest.mark.asyncio
+async def test_owned_fallback_activity_requires_stop_confirmation(tmp_path, monkeypatch):
+    from backend.services import metasploit_service as module
+
+    class OwnedFixture(FixtureTransport):
+        async def start(self):
+            self.identity = str(uuid4())
+
+        async def call(self, method, args=None):
+            return {"1": {"type": "shell"}} if method == "session.list" else {}
+
+    monkeypatch.setattr(module, "PtyTransport", OwnedFixture)
+    service = MetasploitService(tmp_path, EventHub())
+    assert (await service.connect_fallback(confirmed=True)).state == "PTYFallback"
+    transport = service.transport
+    assert await service.shutdown_check()
+    with pytest.raises(ValueError, match="Confirm termination"):
+        await service.disconnect()
+    assert not transport.closed
+    await service.disconnect(confirmed=True)
+    assert transport.closed

@@ -6,13 +6,16 @@ import asyncio
 import json
 import re
 import ssl
+from collections import deque
 from pathlib import Path
+from uuid import uuid4
 
 import keyring
 from pydantic import JsonValue, SecretStr
 
 from backend.events import EventHub
-from backend.platform_utils import atomic_private_write
+from backend.platform_utils import atomic_private_write, framework_host_argv
+from backend.services.pty_transport import PtyTransport
 from backend.services.rpc_transport import FrameworkTransport, RpcFailure, RpcTransport
 from shared.framework import ConnectionStatus, RpcConnect
 
@@ -50,16 +53,22 @@ class MetasploitService:
         self._password: SecretStr | None = None
         self._expected_identity: str | None = None
         self._closed = False
+        self.console_lines: deque[str] = deque(maxlen=10000)
 
     def status(self) -> ConnectionStatus:
         return self._status.model_copy()
 
     async def _state(self, message: str, connected: bool = False) -> None:
         self._status = ConnectionStatus(
-            state="RPCConnected" if connected else "Offline",
+            state=(
+                ("PTYFallback" if isinstance(self.transport, PtyTransport) else "RPCConnected")
+                if connected
+                else "Offline"
+            ),
             instance_id=self._expected_identity,
             endpoint=self._status.endpoint,
             message=message,
+            owned=isinstance(self.transport, PtyTransport),
         )
         await self.events.publish("connection", self._status.model_dump(mode="json"))
 
@@ -115,8 +124,41 @@ class MetasploitService:
             await self._state("Connected using verified TLS and a temporary token.", True)
             return self.status()
 
-    async def disconnect(self) -> ConnectionStatus:
+    async def connect_fallback(self, *, confirmed: bool) -> ConnectionStatus:
+        if not confirmed:
+            raise ValueError("Confirm starting your dedicated owned Metasploit console.")
         async with self._connection_lock:
+            if self.transport is not None or self._reconnect_task is not None:
+                raise ValueError("Disconnect the current framework before starting fallback.")
+            token = uuid4().hex
+            candidate = PtyTransport(
+                framework_host_argv(token),
+                lambda line: self.console_lines.append(self.events.redactor.text(line)),
+                cancel_argv=framework_host_argv(token, cancel=True),
+            )
+            await candidate.start()
+            self.transport = candidate
+            self._expected_identity = candidate.identity
+            self._status = ConnectionStatus(endpoint="Toolkit-MSF owned PTY")
+            await self._state("Connected to the owned structured terminal bridge.", True)
+            return self.status()
+
+    async def shutdown_check(self) -> bool:
+        if not isinstance(self.transport, PtyTransport):
+            return False
+        try:
+            return bool(
+                await self.transport.call("session.list") or await self.transport.call("job.list")
+            )
+        except RpcFailure:
+            return True
+
+    async def disconnect(self, *, confirmed: bool = False) -> ConnectionStatus:
+        async with self._connection_lock:
+            if not confirmed and await self.shutdown_check():
+                raise ValueError(
+                    "Confirm termination of active or uncertain owned framework activity."
+                )
             task, self._reconnect_task = self._reconnect_task, None
             if task is not None:
                 task.cancel()
@@ -233,4 +275,4 @@ class MetasploitService:
 
     async def close(self) -> None:
         self._closed = True
-        await self.disconnect()
+        await self.disconnect(confirmed=True)

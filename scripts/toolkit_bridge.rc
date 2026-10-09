@@ -1,0 +1,4 @@
+<ruby>
+load ENV.fetch('TOOLKIT_BRIDGE_FILE')
+ToolkitBridge.new(framework).run
+</ruby>

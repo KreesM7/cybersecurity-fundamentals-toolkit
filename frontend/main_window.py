@@ -1,10 +1,12 @@
 """Flat desktop dashboard; all service state arrives through the ViewModel."""
 
 from PyQt6.QtCore import Qt, pyqtSlot
-from PyQt6.QtGui import QCloseEvent
+from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QDialog,
     QHBoxLayout,
     QLabel,
+    QLineEdit,
     QListWidget,
     QListWidgetItem,
     QMainWindow,
@@ -19,7 +21,7 @@ from frontend.viewmodels.app_vm import AppViewModel
 from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.activity import ActivityPanel
-from frontend.views.connection import ConnectionPanel
+from frontend.views.desktop import DesktopControls
 from frontend.views.modules import ModuleBrowser
 from frontend.views.payloads import PayloadPanel
 from frontend.views.reports import ReportsPanel
@@ -82,18 +84,82 @@ class MainWindow(QMainWindow):
                 self.register_view(title, panel)
             view_model.tools_changed.connect(self._show_tools)
         if isinstance(view_model, AppViewModel):
-            self.register_view("Workspaces", WorkspacePanel(view_model))
+            desktop_controls = DesktopControls(view_model)
+            content.insertWidget(1, desktop_controls)
+            workspace_panel = WorkspacePanel(view_model)
+            activity_panel = ActivityPanel(view_model)
+            self.register_view("Workspaces", workspace_panel)
             self.register_view("Targets", TargetsPanel(view_model))
             self.register_view("Modules", ModuleBrowser(view_model))
             self.register_view("Payloads", PayloadPanel(view_model))
-            self.register_view("Sessions / Jobs / Console", ActivityPanel(view_model))
+            self.register_view("Sessions / Jobs / Console", activity_panel)
             self.register_view("Artifacts", ArtifactsPanel(view_model))
             self.register_view("Vault", VaultPanel(view_model))
             self.register_view("Reports", ReportsPanel(view_model))
-            self.register_view("Settings", ConnectionPanel(view_model))
+            self.register_view("Settings", desktop_controls.settings_panel)
+            for keys, callback in (
+                ("Ctrl+K", self.command_palette),
+                ("Ctrl+T", lambda: self.navigate_title("Modules")),
+                ("Ctrl+L", lambda: self.navigate_title("Sessions / Jobs / Console")),
+                ("Ctrl+S", workspace_panel.save_notes),
+                ("F5", activity_panel.refresh),
+            ):
+                shortcut = QShortcut(QKeySequence(keys), self)
+                shortcut.activated.connect(callback)
             view_model.state_changed.connect(self._shutdown_result)
             view_model.action_error.connect(self._shutdown_error)
             view_model.watch_events("/ws/events")
+
+    def navigate_title(self, title: str) -> None:
+        for index in range(self.sidebar.count()):
+            item = self.sidebar.item(index)
+            if item and item.text() == title:
+                self.sidebar.setCurrentRow(index)
+                break
+
+    def command_palette(self) -> None:
+        dialog = QDialog(self)
+        dialog.setWindowTitle("Go to page")
+        dialog.resize(420, 420)
+        layout = QVBoxLayout(dialog)
+        query = QLineEdit()
+        query.setPlaceholderText("Type a page name…")
+        choices = QListWidget()
+        layout.addWidget(query)
+        layout.addWidget(choices)
+        for index in range(self.sidebar.count()):
+            item = self.sidebar.item(index)
+            if item:
+                choices.addItem(item.text())
+
+        def filter_pages(value: str) -> None:
+            for index in range(choices.count()):
+                item = choices.item(index)
+                if item:
+                    item.setHidden(value.casefold() not in item.text().casefold())
+            choices.setCurrentItem(
+                next(
+                    (
+                        choices.item(i)
+                        for i in range(choices.count())
+                        if (candidate := choices.item(i)) is not None and not candidate.isHidden()
+                    ),
+                    None,
+                )
+            )
+
+        def accept() -> None:
+            item = choices.currentItem()
+            if item:
+                self.navigate_title(item.text())
+                dialog.accept()
+
+        query.textChanged.connect(filter_pages)
+        query.returnPressed.connect(accept)
+        choices.itemActivated.connect(accept)
+        choices.setCurrentRow(0)
+        query.setFocus()
+        dialog.exec()
 
     def _show_tools(self, values: object) -> None:
         if isinstance(values, list):

@@ -1,0 +1,227 @@
+"""Desktop preferences and dashboard controls using the shared asynchronous ViewModel."""
+
+from pydantic import RootModel
+from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtGui import QDesktopServices
+from PyQt6.QtWidgets import (
+    QApplication,
+    QCheckBox,
+    QComboBox,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QTabWidget,
+    QVBoxLayout,
+    QWidget,
+)
+
+from frontend.theme import apply_theme
+from frontend.viewmodels.app_vm import AppViewModel
+from frontend.views.connection import ConnectionPanel
+from shared.desktop import DashboardSummary, DesktopSettings, UpdateNotice
+from shared.framework import ConnectionStatus
+from shared.vault import VaultStatus
+from shared.workspaces import WorkspaceView
+
+
+class DesktopControls(QWidget):
+    def __init__(self, vm: AppViewModel) -> None:
+        super().__init__()
+        self.vm = vm
+        self.settings: DesktopSettings | None = None
+        self.submitted: DesktopSettings | None = None
+        self.notice = UpdateNotice()
+        root = QVBoxLayout(self)
+        row = QHBoxLayout()
+        row.addWidget(QLabel("Workspace"))
+        self.workspace = QComboBox()
+        row.addWidget(self.workspace, 1)
+        self.workspace.activated.connect(self.switch_workspace)
+        root.addLayout(row)
+        self.counts = QLabel("Loading workspace…")
+        self.status = QLabel("Framework offline · Vault locked")
+        root.addWidget(self.counts)
+        root.addWidget(self.status)
+        self.welcome = QWidget()
+        welcome_layout = QVBoxLayout(self.welcome)
+        welcome = QLabel(
+            "Start with the seven fundamentals tools. Saved captures work offline.\n"
+            "Use Workspaces to organize targets and notes. Set up Toolkit-MSF before\n"
+            "connecting in Settings. Test only systems you own or are permitted to assess.\n"
+            "Ctrl+K: find a page · Ctrl+T: modules · Ctrl+L: console · "
+            "Ctrl+S: save notes · F5: sessions"
+        )
+        welcome.setWordWrap(True)
+        welcome_layout.addWidget(welcome)
+        done = QPushButton("Got it")
+        done.clicked.connect(self.finish_onboarding)
+        welcome_layout.addWidget(done)
+        root.addWidget(self.welcome)
+        self.banner = QWidget()
+        banner_layout = QHBoxLayout(self.banner)
+        self.update_text = QLabel("")
+        self.update_text.setTextFormat(Qt.TextFormat.PlainText)
+        banner_layout.addWidget(self.update_text, 1)
+        view = QPushButton("View release")
+        view.clicked.connect(self.open_release)
+        dismiss = QPushButton("Dismiss")
+        dismiss.clicked.connect(self.dismiss_update)
+        banner_layout.addWidget(view)
+        banner_layout.addWidget(dismiss)
+        root.addWidget(self.banner)
+        self.banner.hide()
+        self.settings_panel = QTabWidget()
+        general = QWidget()
+        form = QVBoxLayout(general)
+        form.addWidget(QLabel("Appearance"))
+        self.theme = QComboBox()
+        self.theme.addItems(["dark", "light", "system"])
+        form.addWidget(self.theme)
+        self.updates = QCheckBox("Check GitHub for updates on startup (no downloads)")
+        form.addWidget(self.updates)
+        self.message = QLabel("Loading settings…")
+        self.message.setTextFormat(Qt.TextFormat.PlainText)
+        form.addWidget(self.message)
+        retry = QPushButton("Retry loading settings")
+        retry.clicked.connect(self.load)
+        form.addWidget(retry)
+        form.addStretch()
+        self.settings_panel.addTab(general, "General")
+        self.settings_panel.addTab(ConnectionPanel(vm), "Metasploit")
+        self.theme.setEnabled(False)
+        self.updates.setEnabled(False)
+        self.theme.currentTextChanged.connect(self.changed)
+        self.updates.toggled.connect(self.changed)
+        self.debounce = QTimer(self)
+        self.debounce.setSingleShot(True)
+        self.debounce.setInterval(400)
+        self.debounce.timeout.connect(self.save)
+        self.timer = QTimer(self)
+        self.timer.setInterval(5000)
+        self.timer.timeout.connect(self.refresh)
+        self.timer.start()
+        vm.state_changed.connect(self.update_state)
+        vm.action_error.connect(self.error)
+        self.load()
+
+    def load(self) -> None:
+        self.vm.get("settings-load", "/api/v1/settings", DesktopSettings)
+
+    def changed(self) -> None:
+        if self.settings:
+            selected = self.theme.currentText()
+            if selected == "system":
+                self.settings.theme = "system"
+            elif selected == "light":
+                self.settings.theme = "light"
+            else:
+                self.settings.theme = "dark"
+            self.settings.check_updates = self.updates.isChecked()
+            application = QApplication.instance()
+            if isinstance(application, QApplication):
+                apply_theme(application, self.settings.theme)
+            self.message.setText("Saving…")
+            self.debounce.start()
+
+    def save(self) -> None:
+        if self.settings and self.submitted is None:
+            self.submitted = self.settings.model_copy()
+            self.vm.mutate(
+                "settings-save", "PUT", "/api/v1/settings", DesktopSettings, self.submitted
+            )
+
+    def finish_onboarding(self) -> None:
+        if self.settings:
+            self.settings.onboarding_complete = True
+            self.welcome.hide()
+            self.debounce.start()
+
+    def dismiss_update(self) -> None:
+        if self.settings:
+            self.settings.dismissed_version = self.notice.version
+            self.banner.hide()
+            self.debounce.start()
+
+    def open_release(self) -> None:
+        # The backend constructs a fixed public repository URL; never open arbitrary response links.
+        prefix = "https://github.com/KreesM7/cybersecurity-fundamentals-toolkit/releases/tag/"
+        if self.notice.version and self.notice.url == prefix + self.notice.version:
+            QDesktopServices.openUrl(QUrl(self.notice.url))
+
+    def switch_workspace(self, index: int) -> None:
+        scope = self.workspace.itemData(index)
+        if scope and scope != self.vm.workspace_id:
+            self.vm.mutate(
+                "workspace-activate", "POST", f"/api/v1/workspaces/{scope}/activate", WorkspaceView
+            )
+
+    def refresh(self) -> None:
+        if self.vm.workspace_id:
+            self.vm.get(
+                "dashboard",
+                f"/api/v1/dashboard?workspace_id={self.vm.workspace_id}",
+                DashboardSummary,
+            )
+            self.vm.vault_request("vault-indicator", "GET", "status", VaultStatus)
+        self.vm.get("connection-status", "/api/v1/connection", ConnectionStatus)
+        self.vm.get("updates", "/api/v1/updates", UpdateNotice)
+
+    def update_state(self, key: str, value: object) -> None:
+        if key == "settings-load" and isinstance(value, DesktopSettings):
+            self.settings = value
+            self.theme.blockSignals(True)
+            self.updates.blockSignals(True)
+            self.theme.setCurrentText(value.theme)
+            self.updates.setChecked(value.check_updates)
+            self.theme.blockSignals(False)
+            self.updates.blockSignals(False)
+            self.theme.setEnabled(True)
+            self.updates.setEnabled(True)
+            self.welcome.setVisible(not value.onboarding_complete)
+            application = QApplication.instance()
+            if isinstance(application, QApplication):
+                apply_theme(application, value.theme)
+            self.message.setText("Settings loaded.")
+            self.refresh()
+        elif key == "settings-save" and isinstance(value, DesktopSettings):
+            self.submitted = None
+            if self.settings != value:
+                self.debounce.start()
+            else:
+                self.message.setText("Saved.")
+            self.refresh()
+        elif key == "workspaces" and isinstance(value, RootModel):
+            self.workspace.clear()
+            for row in value.root:
+                if isinstance(row, WorkspaceView):
+                    self.workspace.addItem(row.name, row.id)
+                    if row.active:
+                        self.workspace.setCurrentIndex(self.workspace.count() - 1)
+        elif key == "workspace":
+            self.counts.setText("Loading workspace…")
+            self.refresh()
+        elif key == "dashboard" and isinstance(value, DashboardSummary):
+            self.counts.setText(
+                f"{value.targets} targets · {value.recorded_sessions} recorded sessions · "
+                f"{value.running_jobs} local jobs · {value.saved_reports} reports"
+            )
+        elif key == "updates" and isinstance(value, UpdateNotice):
+            self.notice = value
+            self.update_text.setText(f"Toolkit {value.version} is available.")
+            self.banner.setVisible(
+                bool(value.version)
+                and bool(self.settings and self.settings.dismissed_version != value.version)
+            )
+        elif key in {"connection", "connection-status"} and isinstance(value, ConnectionStatus):
+            self.status.setText(
+                f"{value.state} · Vault {'unlocked' if self.vm.vault_token else 'locked'}"
+            )
+        elif key in {"vault-indicator", "vault-locked"}:
+            state = self.status.text().split(" · ")[0]
+            unlocked = isinstance(value, VaultStatus) and value.unlocked
+            self.status.setText(f"{state} · Vault {'unlocked' if unlocked else 'locked'}")
+
+    def error(self, key: str, message: str) -> None:
+        if key.startswith("settings"):
+            self.submitted = None
+            self.message.setText(message + " Change a setting to retry saving, or retry loading.")

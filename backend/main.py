@@ -28,6 +28,7 @@ from backend.request_limits import RequestBodyLimit
 from backend.routers import (
     activity,
     connection,
+    desktop,
     modules,
     payloads,
     reports,
@@ -38,6 +39,7 @@ from backend.routers import (
 )
 from backend.services.activity_service import ActivityService
 from backend.services.artifact_service import ArtifactService
+from backend.services.desktop_service import DesktopService
 from backend.services.metasploit_service import MetasploitService
 from backend.services.module_service import ModuleService
 from backend.services.payload_service import PayloadService
@@ -96,6 +98,8 @@ def create_app(
             app.state.mutations = MutationCoordinator(
                 SQLAlchemyMutationStore(service.catalog_sessions), profile=profile
             )
+            app.state.desktop = DesktopService(profile)
+            await app.state.desktop.start()
             tool_service = ToolService(service, jobs)
             app.state.tools = tool_service
             app.state.modules = ModuleService(service, framework, hub, app.state.mutations)
@@ -111,6 +115,8 @@ def create_app(
             )
             yield
         finally:
+            if hasattr(app.state, "desktop"):
+                await app.state.desktop.close()
             if hasattr(app.state, "vault"):
                 await app.state.vault.close()
             try:
@@ -160,6 +166,7 @@ def create_app(
     app.include_router(activity.router, prefix="/api/v1")
     app.include_router(vault.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
+    app.include_router(desktop.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

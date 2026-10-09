@@ -119,6 +119,7 @@ class AppViewModel(ToolsViewModel):
                     "notes",
                     "vault",
                     "artifacts",
+                    "dashboard",
                 )
             )
             and scope != self.workspace_id

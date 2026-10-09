@@ -30,6 +30,7 @@ from backend.routers import (
     connection,
     modules,
     payloads,
+    reports,
     targets,
     tools,
     vault,
@@ -40,6 +41,7 @@ from backend.services.artifact_service import ArtifactService
 from backend.services.metasploit_service import MetasploitService
 from backend.services.module_service import ModuleService
 from backend.services.payload_service import PayloadService
+from backend.services.report_service import ReportService
 from backend.services.rpc_transport import RpcFailure
 from backend.services.tool_service import ToolService
 from backend.services.vault_service import VaultAccessError, VaultService
@@ -101,6 +103,9 @@ def create_app(
             app.state.vault = VaultService(service, hub)
             await app.state.vault.start()
             app.state.artifacts = ArtifactService(service)
+            app.state.reports = ReportService(
+                service, app.state.artifacts, jobs, app.state.mutations
+            )
             app.state.payloads = PayloadService(
                 app.state.modules, app.state.artifacts, jobs, app.state.mutations
             )
@@ -154,6 +159,7 @@ def create_app(
     app.include_router(payloads.router, prefix="/api/v1")
     app.include_router(activity.router, prefix="/api/v1")
     app.include_router(vault.router, prefix="/api/v1")
+    app.include_router(reports.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

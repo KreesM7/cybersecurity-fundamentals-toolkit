@@ -21,6 +21,7 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+pdf = ["weasyprint==70.0"]
 build = ["PyInstaller==6.22.3"]
 dev = [
   "pytest==9.1.1", "pytest-asyncio==1.4.0", "pytest-cov==7.1.0",

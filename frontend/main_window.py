@@ -20,6 +20,7 @@ from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.connection import ConnectionPanel
 from frontend.views.modules import ModuleBrowser
+from frontend.views.payloads import PayloadPanel
 from frontend.views.tools import PANELS, create_panel
 from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
@@ -82,6 +83,7 @@ class MainWindow(QMainWindow):
             view_model.tools_changed.connect(self._show_tools)
         if isinstance(view_model, AppViewModel):
             self.register_view("Modules", ModuleBrowser(view_model))
+            self.register_view("Payloads", PayloadPanel(view_model))
             self.register_view("Settings", ConnectionPanel(view_model))
             view_model.state_changed.connect(self._shutdown_result)
             view_model.action_error.connect(self._shutdown_error)

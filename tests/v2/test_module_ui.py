@@ -121,3 +121,39 @@ def test_rpc_password_is_sent_only_at_explicit_transport_boundary():
     assert "unique-fixture-secret" not in repr(request)
     assert "unique-fixture-secret" not in request.model_dump_json()
     assert request.transport_dump()["password"] == "unique-fixture-secret"
+
+
+def test_payload_controls_and_generation_request():
+    from frontend.views.payloads import PayloadPanel
+    from shared.payloads import PayloadCatalog
+
+    app = QApplication.instance() or QApplication([])
+    vm = ViewModelFixture()
+    panel = PayloadPanel(vm)
+    path = "payload/linux/x64/shell_reverse_tcp"
+    panel.update_state(
+        "generator-search",
+        ModuleSearch(
+            modules=[ModuleSummary(path=path, name="Fixture", kind="payload", rank="normal")]
+        ),
+    )
+    panel.update_state(
+        "generator-catalog", PayloadCatalog(formats=["raw", "python"], encoders=["generic/none"])
+    )
+    panel.update_state(
+        "generator-detail",
+        ModuleDetail(
+            path=path, framework_id=uuid4(), name="Fixture", description="Fixture", options=[]
+        ),
+    )
+    panel.owned.setChecked(True)
+    panel.encoder.setCurrentIndex(1)
+    panel.iterations.setValue(2)
+    panel.start()
+    request = vm.calls[-1][1][-1]
+    assert request.encoder == "generic/none" and request.iterations == 2
+    assert request.format == "raw" and request.confirmed and request.lhost == "127.0.0.1"
+    assert not panel.generate.isEnabled() and not panel.save.isEnabled()
+    panel.timer.stop()
+    panel.deleteLater()
+    app.processEvents()

@@ -127,6 +127,11 @@ def framework_host_argv(token: str, *, cancel: bool = False) -> list[str]:
     return wsl_argv(arguments) if is_windows() else arguments
 
 
+def payload_host_argv() -> list[str]:
+    arguments = ["/opt/toolkit-msf/venv/bin/python", "/opt/toolkit-msf/payload-host.py"]
+    return wsl_argv(arguments) if is_windows() else arguments
+
+
 def capture_worker_argv(arguments: Sequence[str]) -> list[str]:
     """Invoke only the independently installed worker, never frozen application Python."""
     if is_windows():

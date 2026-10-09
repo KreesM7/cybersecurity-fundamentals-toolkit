@@ -136,6 +136,8 @@ class PtyTransport:
                         data = record.get("data")
                         if method == "module.search" and isinstance(data, list):
                             data = {"modules": data}
+                        if method == "module.encode_formats" and isinstance(data, list):
+                            data = {"formats": data}
                         if not isinstance(data, dict):
                             raise ValueError("Invalid structured reply")
                         return data

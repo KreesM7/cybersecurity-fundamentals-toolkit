@@ -1,8 +1,12 @@
 """Async typed HTTPS boundary; views never perform HTTP requests directly."""
 
+import asyncio
+import os
 import re
 import ssl
+import tempfile
 from collections.abc import Mapping
+from pathlib import Path
 from types import TracebackType
 from typing import Self, TypeVar
 from urllib.parse import urlsplit
@@ -159,6 +163,35 @@ class ApiClient:
             files={"file": (basename, content, "application/octet-stream")},
         ) as response:
             return response_type.model_validate_json(await self._bounded_response(response))
+
+    async def download(self, path: str, destination: str) -> None:
+        if not re.fullmatch(
+            r"/api/v1/artifacts/[a-f0-9-]{36}/download\?workspace_id=[a-f0-9-]{36}", path
+        ):
+            raise ValueError("Expected a managed artifact download")
+        async with self._client.stream("GET", path) as response:
+            content = await self._bounded_response(response)
+
+        def save() -> None:
+            target = Path(destination).absolute()
+            temporary: str | None = None
+            try:
+                with tempfile.NamedTemporaryFile(dir=target.parent, delete=False) as stream:
+                    temporary = stream.name
+                    stream.write(content)
+                    stream.flush()
+                    os.fsync(stream.fileno())
+                os.replace(temporary, target)
+            finally:
+                if temporary and Path(temporary).exists():
+                    Path(temporary).unlink()
+
+        task = asyncio.create_task(asyncio.to_thread(save))
+        try:
+            await asyncio.shield(task)
+        except asyncio.CancelledError:
+            await task
+            raise
 
     async def health(self) -> HealthResponse:
         """Fetch actual backend identity and readiness."""

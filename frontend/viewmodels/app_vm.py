@@ -3,7 +3,7 @@
 import json
 import ssl
 from urllib.parse import urlencode
-from uuid import UUID
+from uuid import UUID, uuid4
 
 import httpx
 from pydantic import BaseModel, RootModel
@@ -133,6 +133,15 @@ class AppViewModel(ToolsViewModel):
 
     def targets(self) -> None:
         self.get("targets", "/api/v1/targets/", RootModel[list[TargetView]])
+
+    def save_artifact(self, workspace_id: UUID, identifier: UUID, destination: str) -> None:
+        request_id = uuid4()
+        self._actions[request_id] = "artifact-saved"
+        self._worker.download(
+            f"/api/v1/artifacts/{identifier}/download?workspace_id={workspace_id}",
+            destination,
+            request_id,
+        )
 
     def transfer_target(self, identifier: UUID) -> None:
         self.mutate(

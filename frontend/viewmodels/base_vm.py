@@ -189,6 +189,24 @@ class ClientWorker(QThread):
             self._upload(path, response_type, body, filename, request_id), self._loop
         )
 
+    async def _download(self, path: str, destination: str, request_id: UUID) -> None:
+        try:
+            if self._client is None:
+                raise RuntimeError("Client unavailable")
+            await self._client.download(path, destination)
+            self.mutation_completed.emit(request_id, EmptyResponse())
+        except asyncio.CancelledError:
+            raise
+        except Exception:
+            self.request_failed.emit(
+                request_id, "Could not save the artifact. Check the destination and retry."
+            )
+
+    def download(self, path: str, destination: str, request_id: UUID) -> None:
+        if self._closed:
+            raise RuntimeError("Client worker is closed")
+        asyncio.run_coroutine_threadsafe(self._download(path, destination, request_id), self._loop)
+
     async def _shutdown(self) -> None:
         current = asyncio.current_task()
         pending = [task for task in asyncio.all_tasks() if task is not current]

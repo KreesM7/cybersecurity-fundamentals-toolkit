@@ -44,6 +44,7 @@ install -m 644 "$script_dir/toolkit_rpc.rb" /opt/toolkit-msf/toolkit_rpc.rb
 python3 -m venv /opt/toolkit-msf/venv
 /opt/toolkit-msf/venv/bin/python -m pip install 'pexpect==4.9.0' 'ptyprocess==0.7.0'
 install -m 755 "$script_dir/pty-host.py" /opt/toolkit-msf/pty-host.py
+install -m 755 "$script_dir/payload-host.py" /opt/toolkit-msf/payload-host.py
 install -m 644 "$script_dir/toolkit_bridge.rb" /opt/toolkit-msf/toolkit_bridge.rb
 install -m 644 "$script_dir/toolkit_bridge.rc" /opt/toolkit-msf/toolkit_bridge.rc
 echo 'Installed. Start RPC as your ordinary user: python3 /opt/toolkit-msf/start-msfrpc.py'

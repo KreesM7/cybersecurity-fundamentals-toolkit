@@ -113,6 +113,9 @@ class ModuleService:
                 if not re.fullmatch(r"[A-Za-z0-9_.:-]{1,100}", field) or not isinstance(item, dict):
                     raise RpcFailure("Framework returned invalid option metadata.")
                 default = item.get("default")
+                if item.get("type") == "bool" and isinstance(default, str):
+                    if default.lower() in {"true", "false"}:
+                        default = default.lower() == "true"
                 choices = item.get("enums", [])
                 fields.append(
                     OptionSpec(

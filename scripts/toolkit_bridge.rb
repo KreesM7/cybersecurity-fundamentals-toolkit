@@ -12,6 +12,7 @@ class ToolkitBridge
     @prefix = "TOOLKIT/#{ENV.fetch('TOOLKIT_BRIDGE_NONCE')}/"
     @allowed = %w[core.version module.exploits module.auxiliary module.post module.payloads
                   module.encoders module.nops module.evasion module.info module.options module.search
+                  module.encode_formats
                   module.execute module.compatible_payloads module.target_compatible_payloads
                   session.list session.stop session.shell_read session.shell_write
                   session.meterpreter_read session.meterpreter_write job.list job.info job.stop

@@ -118,6 +118,7 @@ async def test_workspace_claim_stop_and_command_replay_redaction(tmp_path):
 @pytest.mark.asyncio
 async def test_event_reconnect_requests_rest_resync_without_mutations():
     from types import SimpleNamespace
+
     from frontend.viewmodels.base_vm import ClientWorker
 
     received = []

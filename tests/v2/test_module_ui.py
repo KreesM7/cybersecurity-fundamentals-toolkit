@@ -161,7 +161,7 @@ def test_payload_controls_and_generation_request():
 
 def test_workspace_target_and_terminal_widgets_use_captured_ids():
     from frontend.views.activity import ActivityPanel
-    from frontend.views.workspaces import WorkspacePanel, TargetsPanel
+    from frontend.views.workspaces import TargetsPanel, WorkspacePanel
     from shared.activity import ConsoleHandle, TerminalOutput
 
     app = QApplication.instance() or QApplication([])

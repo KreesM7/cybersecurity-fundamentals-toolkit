@@ -192,3 +192,31 @@ def test_workspace_target_and_terminal_widgets_use_captured_ids():
     for panel in (targets, workspaces, activity):
         panel.deleteLater()
     app.processEvents()
+
+
+def test_vault_widgets_clear_reveals_and_do_not_save_candidates_automatically():
+    from frontend.views.vault import VaultPanel
+    from shared.vault import CredentialReveal
+
+    app = QApplication.instance() or QApplication([])
+    vm = ViewModelFixture()
+    panel = VaultPanel(vm)
+    panel.service.setText("fixture")
+    panel.username.setText("alice")
+    panel.secret.setText("temporary-secret")
+    panel.candidate()
+    assert vm.calls[-1][0] == "vault_request"
+    assert vm.calls[-1][1][0] == "vault-candidate"
+    assert not panel.secret.text()
+    panel.update_state(
+        "vault-reveal",
+        CredentialReveal(
+            id=uuid4(), service="fixture", username="alice", secret="revealed", notes=""
+        ),
+    )
+    assert panel.revealed.text() == "revealed" and panel.hide_timer.isActive()
+    panel.update_state("vault-locked", None)
+    assert not panel.revealed.text() and not panel.hide_timer.isActive()
+    panel.status_timer.stop()
+    panel.deleteLater()
+    app.processEvents()

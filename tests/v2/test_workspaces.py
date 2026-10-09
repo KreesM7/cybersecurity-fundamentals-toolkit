@@ -31,6 +31,7 @@ async def runtime(tmp_path):
     from backend.mutations import MutationConflictError, MutationCoordinator, UnknownOutcomeError
     from backend.routers.targets import router as targets
     from backend.routers.workspaces import router as workspaces
+    from backend.services.vault_service import VaultService
     from backend.services.workspace_service import WorkspaceConflict, WorkspaceNotFound
 
     @asynccontextmanager
@@ -41,7 +42,9 @@ async def runtime(tmp_path):
             SQLAlchemyMutationStore(app.state.workspaces.catalog_sessions)
         )
         app.state.events = EventHub()
+        app.state.vault = VaultService(app.state.workspaces, app.state.events)
         yield
+        await app.state.vault.close()
         await app.state.events.close()
         await app.state.workspaces.close()
 

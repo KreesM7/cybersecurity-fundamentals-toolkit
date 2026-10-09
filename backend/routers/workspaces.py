@@ -71,6 +71,7 @@ async def activate(
 
     async def action() -> WorkspaceView:
         result = await workspaces.activate(identifier)
+        await request.app.state.vault.lock_all()
         await request.app.state.events.publish(
             "workspace-activated",
             {"previous_id": str(old_active), "id": str(identifier)},

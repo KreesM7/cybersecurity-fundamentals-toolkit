@@ -25,7 +25,16 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.request_limits import RequestBodyLimit
-from backend.routers import activity, connection, modules, payloads, targets, tools, workspaces
+from backend.routers import (
+    activity,
+    connection,
+    modules,
+    payloads,
+    targets,
+    tools,
+    vault,
+    workspaces,
+)
 from backend.services.activity_service import ActivityService
 from backend.services.artifact_service import ArtifactService
 from backend.services.metasploit_service import MetasploitService
@@ -33,6 +42,7 @@ from backend.services.module_service import ModuleService
 from backend.services.payload_service import PayloadService
 from backend.services.rpc_transport import RpcFailure
 from backend.services.tool_service import ToolService
+from backend.services.vault_service import VaultAccessError, VaultService
 from backend.services.workspace_service import (
     WorkspaceConflictError,
     WorkspaceNotFoundError,
@@ -88,12 +98,16 @@ def create_app(
             app.state.tools = tool_service
             app.state.modules = ModuleService(service, framework, hub, app.state.mutations)
             app.state.activity = ActivityService(app.state.modules)
+            app.state.vault = VaultService(service, hub)
+            await app.state.vault.start()
             app.state.artifacts = ArtifactService(service)
             app.state.payloads = PayloadService(
                 app.state.modules, app.state.artifacts, jobs, app.state.mutations
             )
             yield
         finally:
+            if hasattr(app.state, "vault"):
+                await app.state.vault.close()
             try:
                 await jobs.close()
             finally:
@@ -139,6 +153,7 @@ def create_app(
     app.include_router(modules.router, prefix="/api/v1")
     app.include_router(payloads.router, prefix="/api/v1")
     app.include_router(activity.router, prefix="/api/v1")
+    app.include_router(vault.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:
@@ -156,6 +171,8 @@ def create_app(
     async def known_error(request: Request, exc: Exception) -> JSONResponse:
         if isinstance(exc, (MutationConflictError, UnknownOutcomeError, WorkspaceConflictError)):
             status, detail = 409, str(exc)
+        elif isinstance(exc, VaultAccessError):
+            status, detail = 423, str(exc)
         elif isinstance(exc, RpcFailure):
             status, detail = 503, str(exc)
         elif isinstance(exc, (MutationCapacityError, JobQueueFullError)):
@@ -179,6 +196,7 @@ def create_app(
         KeyError,
         ValueError,
         RpcFailure,
+        VaultAccessError,
     ):
         app.add_exception_handler(exception, known_error)
 

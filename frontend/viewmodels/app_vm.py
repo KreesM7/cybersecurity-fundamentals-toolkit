@@ -6,7 +6,7 @@ from urllib.parse import urlencode
 from uuid import UUID, uuid4
 
 import httpx
-from pydantic import BaseModel, RootModel
+from pydantic import BaseModel, RootModel, SecretStr
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from frontend.viewmodels.tools_vm import ToolsViewModel
@@ -37,6 +37,9 @@ class AppViewModel(ToolsViewModel):
     ) -> None:
         super().__init__(base_url, ssl_context, instance_token, transport=transport, parent=parent)
         self.workspace_id: UUID | None = None
+        self.vault_token: SecretStr | None = None
+        self._vault_generation = 0
+        self._vault_generations: dict[UUID, int] = {}
         self._actions: dict[UUID, str] = {}
         self._latest: dict[str, UUID] = {}
         self._action_scopes: dict[UUID, UUID | None] = {}
@@ -52,6 +55,36 @@ class AppViewModel(ToolsViewModel):
 
     def invalidate(self, key: str) -> None:
         self._latest[key] = uuid4()
+
+    def vault_request(
+        self,
+        key: str,
+        method: str,
+        suffix: str,
+        model: type[BaseModel],
+        body: SchemaModel | None = None,
+    ) -> None:
+        if self.workspace_id is None:
+            return
+        identifier = uuid4()
+        self._vault_generations[identifier] = self._vault_generation
+        headers = {"X-Vault-Token": self.vault_token.get_secret_value()} if self.vault_token else {}
+        self._actions[identifier] = key
+        self._action_scopes[identifier] = self.workspace_id
+        if method == "GET":
+            self._latest[key] = identifier
+        self._worker.run_mutation(
+            method,
+            f"/api/v1/vault/{suffix}?workspace_id={self.workspace_id}",
+            model,
+            body,
+            identifier,
+            headers,
+        )
+
+    def clear_vault_state(self) -> None:
+        self.vault_token = None
+        self._vault_generation += 1
 
     def mutate(
         self,
@@ -71,9 +104,23 @@ class AppViewModel(ToolsViewModel):
             return
         key = self._actions.pop(identifier, None)
         scope = self._action_scopes.pop(identifier, None)
+        generation = self._vault_generations.pop(identifier, None)
+        if generation is not None and generation != self._vault_generation:
+            return
         if (
             key
-            and key.startswith(("activity", "terminal", "module", "targets", "target-", "notes"))
+            and key.startswith(
+                (
+                    "activity",
+                    "terminal",
+                    "module",
+                    "targets",
+                    "target-",
+                    "notes",
+                    "vault",
+                    "artifacts",
+                )
+            )
             and scope != self.workspace_id
         ):
             return
@@ -83,6 +130,7 @@ class AppViewModel(ToolsViewModel):
             active = next((row.id for row in value.root if row.active), None)
             if active != self.workspace_id:
                 self.workspace_id = active
+                self.clear_vault_state()
                 self.state_changed.emit("workspace", active)
         self.state_changed.emit(key, value)
 
@@ -90,6 +138,7 @@ class AppViewModel(ToolsViewModel):
         if isinstance(identifier, UUID):
             key = self._actions.pop(identifier, None)
             self._action_scopes.pop(identifier, None)
+            self._vault_generations.pop(identifier, None)
             if key:
                 self.action_error.emit(key, message)
 
@@ -102,6 +151,12 @@ class AppViewModel(ToolsViewModel):
             return
         if not isinstance(event, dict):
             return
+        if event.get("topic") == "vault-locked" and event.get("workspace_id") in {
+            None,
+            str(self.workspace_id),
+        }:
+            self.clear_vault_state()
+            self.state_changed.emit("vault-locked", None)
         self.state_changed.emit("event", event)
         if event.get("topic") in {"workspace-activated", "resync"}:
             self.refresh_workspaces()

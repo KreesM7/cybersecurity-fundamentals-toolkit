@@ -23,6 +23,7 @@ from frontend.views.connection import ConnectionPanel
 from frontend.views.modules import ModuleBrowser
 from frontend.views.payloads import PayloadPanel
 from frontend.views.tools import PANELS, create_panel
+from frontend.views.vault import VaultPanel
 from frontend.views.workspaces import ArtifactsPanel, TargetsPanel, WorkspacePanel
 from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
@@ -86,6 +87,7 @@ class MainWindow(QMainWindow):
             self.register_view("Payloads", PayloadPanel(view_model))
             self.register_view("Sessions / Jobs / Console", ActivityPanel(view_model))
             self.register_view("Artifacts", ArtifactsPanel(view_model))
+            self.register_view("Vault", VaultPanel(view_model))
             self.register_view("Settings", ConnectionPanel(view_model))
             view_model.state_changed.connect(self._shutdown_result)
             view_model.action_error.connect(self._shutdown_error)

@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PyQt6.QtWidgets import QWidget
+
+    from frontend.viewmodels.tools_vm import ToolsViewModel
+
 import mimetypes
 from dataclasses import dataclass
 from importlib import import_module
@@ -42,7 +51,7 @@ def readiness() -> str:
     return ""
 
 
-def extension_status(extension, mime):
+def extension_status(extension: str, mime: str) -> tuple[str, str]:
     expected = mimetypes.guess_type("sample" + extension, strict=False)[0] if extension else None
     aliases = {
         "application/x-zip-compressed": "application/zip",
@@ -59,7 +68,7 @@ def extension_status(extension, mime):
     ), expected
 
 
-def identify_file(filename, task=None):
+def identify_file(filename: str | Path, task: TaskContext | None = None) -> FileReport:
     task = task or TaskContext()
     task.check()
     path = Path(filename)
@@ -112,7 +121,7 @@ def identify_bytes(content: bytes, filename: str, task: TaskContext) -> FileRepo
     return FileReport(mime, description, extension, expected, state, len(sample))
 
 
-def create_panel(context):
+def create_panel(context: ToolsViewModel) -> QWidget:
     from frontend.views.tools import create_panel as factory
 
     return factory(MODULE.id, context)

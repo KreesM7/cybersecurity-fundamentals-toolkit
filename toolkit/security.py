@@ -1,19 +1,33 @@
 import re
 import socket
 import time
+from collections.abc import Sequence
 from dataclasses import dataclass, replace
-from ipaddress import IPv4Address, IPv4Network, IPv6Address, ip_address, ip_interface, ip_network
+from ipaddress import (
+    IPv4Address,
+    IPv4Interface,
+    IPv4Network,
+    IPv6Address,
+    ip_address,
+    ip_interface,
+    ip_network,
+)
 from queue import Empty, Queue
 from threading import BoundedSemaphore, Thread
+from typing import Any
 from urllib.parse import urljoin, urlsplit, urlunsplit
 
-PRIVATE_V4 = tuple(ip_network(value) for value in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16"))
+from toolkit.task_context import TaskContext
+
+PRIVATE_V4 = tuple(
+    IPv4Network(value) for value in ("10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16")
+)
 UNSPECIFIED_V4 = ip_network("0.0.0.0/8")
 DNS_SECONDS = 3
 _dns_slots = BoundedSemaphore(2)
 
 
-def is_private_v4(address):
+def is_private_v4(address: IPv4Address | IPv6Address) -> bool:
     return isinstance(address, IPv4Address) and any(address in network for network in PRIVATE_V4)
 
 
@@ -42,17 +56,17 @@ class WebTarget:
     query: str
 
     @property
-    def origin(self):
+    def origin(self) -> tuple[str, str, int]:
         return self.scheme, self.host, self.port
 
     @property
-    def authority(self):
+    def authority(self) -> str:
         host = "[" + self.host + "]" if ":" in self.host else self.host
         default = 443 if self.scheme == "https" else 80
         return host if self.port == default else f"{host}:{self.port}"
 
     @property
-    def url(self):
+    def url(self) -> str:
         return urlunsplit((self.scheme, self.authority, self.path, self.query, ""))
 
 
@@ -112,15 +126,18 @@ def validate_url(value: str) -> WebTarget:
     )
 
 
-def resolve_web_target(target: WebTarget, task) -> WebTarget:
+def resolve_web_target(target: WebTarget, task: TaskContext) -> WebTarget:
     if target.ip is not None:
         return target
     task.check()
     if not _dns_slots.acquire(blocking=False):
         raise ValueError("DNS resolver is still busy. Wait briefly before retrying.")
-    result = Queue(maxsize=1)
+    # getaddrinfo exposes platform-dependent socket address tuples.
+    result: Queue[tuple[Sequence[tuple[int, int, int, str, Any]] | None, Exception | None]] = Queue(
+        maxsize=1
+    )
 
-    def lookup():
+    def lookup() -> None:
         try:
             try:
                 answers = socket.getaddrinfo(target.host, target.port, type=socket.SOCK_STREAM)
@@ -150,6 +167,8 @@ def resolve_web_target(target: WebTarget, task) -> WebTarget:
     task.check()
     if error is not None:
         raise ValueError("DNS resolution failed: " + str(error)) from error
+    if answers is None:
+        raise ValueError("DNS returned no result.")
     addresses = []
     for family, _, _, _, sockaddr in answers:
         if family not in (socket.AF_INET, socket.AF_INET6):
@@ -192,7 +211,7 @@ def validate_subnet(
     if interface_ip is None or netmask is None:
         raise ValueError("Provide both an interface address and its netmask.")
     interface = ip_interface(f"{interface_ip}/{netmask}")
-    if not isinstance(network, IPv4Network) or not is_private_v4(interface.ip):
+    if not isinstance(interface, IPv4Interface) or not is_private_v4(interface.ip):
         raise ValueError("Select an interface with an RFC1918 IPv4 address.")
     if not any(network.subnet_of(private) for private in PRIVATE_V4):
         raise ValueError("Only RFC1918 IPv4 subnets can be scanned.")

@@ -9,6 +9,7 @@ import struct
 from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
+from typing import BinaryIO, TextIO
 
 from toolkit.task_context import TaskContext
 
@@ -39,14 +40,14 @@ class TrafficData:
     skipped: int = 0
     complete: bool = True
 
-    def bad(self, position, reason):
+    def bad(self, position: str, reason: str) -> None:
         self.skipped += 1
         self.complete = False
         if len(self.warnings) < 10:
             self.warnings.append(f"{position}: {reason}")
 
 
-def parse_timestamp(value):
+def parse_timestamp(value: str | float | int) -> float:
     text = str(value).strip()
     try:
         timestamp = float(text)
@@ -68,7 +69,7 @@ def parse_timestamp(value):
     return timestamp
 
 
-def _log_timestamp(text):
+def _log_timestamp(text: str) -> float:
     # English log month names are independent of the computer's locale.
     match = re.fullmatch(r"(\d{2})/([A-Za-z]{3})/(\d{4}):(\d{2}):(\d{2}):(\d{2}) ([+-]\d{4})", text)
     if not match or match[2] not in MONTHS:
@@ -78,14 +79,14 @@ def _log_timestamp(text):
     return parse_timestamp(iso)
 
 
-def _source(value):
+def _source(value: str) -> str:
     try:
         return str(ipaddress.ip_address(value))
     except ValueError as exc:
         raise ValueError("source_ip must be a literal IPv4 or IPv6 address") from exc
 
 
-def _bytes(value):
+def _bytes(value: str | int) -> int:
     try:
         count = int(value)
     except (ValueError, TypeError) as exc:
@@ -95,7 +96,9 @@ def _bytes(value):
     return count
 
 
-def _text_stream(source, suffix, data, require_volume, task):
+def _text_stream(
+    source: TextIO, suffix: str, data: TrafficData, require_volume: bool, task: TaskContext
+) -> None:
     if suffix.lower() == ".csv":
         reader = csv.DictReader(source)
         required = {"timestamp", "source_ip"} | ({"bytes", "protocol"} if require_volume else set())
@@ -164,7 +167,7 @@ def _text_stream(source, suffix, data, require_volume, task):
                 break
 
 
-def _validate_capture(source, task):
+def _validate_capture(source: BinaryIO, task: TaskContext) -> None:
     """Validate saved capture framing without allocating packet payloads."""
     length = source.seek(0, 2)
     source.seek(0)
@@ -247,7 +250,9 @@ def read_traffic_bytes(
     return data
 
 
-def read_traffic(filename, require_volume=False, task=None):
+def read_traffic(
+    filename: str | Path, require_volume: bool = False, task: TaskContext | None = None
+) -> TrafficData:
     path = Path(filename)
     if not path.is_file():
         raise ValueError("Choose a readable local file.")
@@ -256,7 +261,7 @@ def read_traffic(filename, require_volume=False, task=None):
     return read_traffic_bytes(content, path.name, require_volume, task)
 
 
-def utc_label(timestamp):
+def utc_label(timestamp: float) -> str:
     return (
         datetime.fromtimestamp(timestamp, UTC)
         .isoformat(timespec="milliseconds")
@@ -264,7 +269,7 @@ def utc_label(timestamp):
     )
 
 
-def input_summary(data):
+def input_summary(data: TrafficData) -> str:
     state = "Complete input" if data.complete else "INCOMPLETE analysis"
     return (
         f"{state}: {len(data.events):,} {data.unit}; "

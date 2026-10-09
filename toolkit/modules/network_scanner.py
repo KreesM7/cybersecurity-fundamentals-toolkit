@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PyQt6.QtWidgets import QWidget
+
+    from frontend.viewmodels.tools_vm import ToolsViewModel
+
 import socket
 import subprocess
 from dataclasses import dataclass
@@ -7,6 +16,7 @@ from typing import Any
 
 from toolkit.core import ModuleSpec
 from toolkit.security import is_private_v4, validate_subnet
+from toolkit.task_context import TaskContext
 
 COMMON_PORTS = "21,22,23,25,53,80,110,135,139,143,443,445,3306,3389,5432,5900,8080,8443"
 
@@ -26,7 +36,7 @@ class HostResult:
 
 
 def list_interfaces() -> list[NetworkInterface]:
-    import psutil
+    import psutil  # type: ignore[import-untyped]
 
     stats = psutil.net_if_stats()
     interfaces = []
@@ -79,8 +89,13 @@ def interpret_host(ip: str, response: dict[str, Any]) -> HostResult:
     return HostResult(ip, "Responded" if responded else "Inconclusive", ports)
 
 
-def scan_subnet(subnet, interface=None, task=None, *, authorized=False):
-    from toolkit.task_context import TaskContext
+def scan_subnet(
+    subnet: str,
+    interface: NetworkInterface | None = None,
+    task: TaskContext | None = None,
+    *,
+    authorized: bool = False,
+) -> list[HostResult]:
 
     task = task or TaskContext()
     if not authorized:
@@ -95,7 +110,7 @@ def scan_subnet(subnet, interface=None, task=None, *, authorized=False):
         else validate_subnet(subnet)
     )
     task.check()
-    import nmap
+    import nmap  # type: ignore[import-untyped]
 
     executable = nmap_path()
     # Use python-nmap's XML analysis API without its constructor/scan subprocesses,
@@ -149,7 +164,7 @@ def scan_subnet(subnet, interface=None, task=None, *, authorized=False):
     return results
 
 
-def create_panel(context):
+def create_panel(context: ToolsViewModel) -> QWidget:
     from frontend.views.tools import create_panel as factory
 
     return factory(MODULE.id, context)

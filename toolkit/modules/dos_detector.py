@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PyQt6.QtWidgets import QWidget
+
+    from frontend.viewmodels.tools_vm import ToolsViewModel
+
 import math
 from collections import Counter
 from dataclasses import dataclass
@@ -20,7 +29,7 @@ def detect_spikes(
     if type(threshold) is not int or threshold < 1:
         raise ValueError("Threshold must be a positive integer.")
     task = task or TaskContext()
-    counts = Counter()
+    counts: Counter[tuple[str, int]] = Counter()
     for index, event in enumerate(events):
         if index % 1000 == 0:
             task.check()
@@ -34,11 +43,11 @@ def detect_spikes(
     ]
 
 
-def readiness():
+def readiness() -> str:
     return "CSV/log ready; saved captures require the separate PCAP worker."
 
 
-def create_panel(context):
+def create_panel(context: ToolsViewModel) -> QWidget:
     from frontend.views.tools import create_panel as factory
 
     return factory(MODULE.id, context)

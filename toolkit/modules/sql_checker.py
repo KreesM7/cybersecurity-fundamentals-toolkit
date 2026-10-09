@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PyQt6.QtWidgets import QWidget
+
+    from frontend.viewmodels.tools_vm import ToolsViewModel
+
 import hashlib
 import math
 import re
@@ -11,6 +20,7 @@ from urllib.parse import quote, urlencode
 
 from toolkit.core import ModuleSpec
 from toolkit.security import resolve_web_target, validate_form_action, validate_url
+from toolkit.task_context import TaskContext
 
 PROBES = ("'", '"', "''")
 SQL_ERRORS = {
@@ -57,14 +67,14 @@ class Finding:
 
 
 class LimitedClient:
-    def __init__(self, task=None):
-        from toolkit.task_context import TaskContext
-
+    def __init__(self, task: TaskContext | None = None) -> None:
         self.task = task or TaskContext()
         self.count = 0
-        self.resolved_ips = {}
+        self.resolved_ips: dict[tuple[str, int], str | None] = {}
 
-    def request(self, url, method="GET", fields=()):
+    def request(
+        self, url: str, method: str = "GET", fields: list[tuple[str, str]] | tuple[()] = ()
+    ) -> Response:
         global _next_request_at
         import urllib3
 
@@ -91,29 +101,36 @@ class LimitedClient:
         if method == "GET" and encoded:
             query = query + "&" + encoded if query else encoded
         path = quote(target.path, safe="/%:@!$&'()*+,;=-._~") + ("?" + query if query else "")
-        options = {
-            "host": target.ip,
-            "port": target.port,
-            "timeout": urllib3.Timeout(connect=3, read=5),
-            "maxsize": 1,
-        }
+        if target.ip is None:
+            raise ValueError("Target address could not be resolved.")
+        pool: urllib3.HTTPConnectionPool
         if target.scheme == "https":
             pool = urllib3.HTTPSConnectionPool(
-                **options,
+                host=target.ip,
+                port=target.port,
+                timeout=urllib3.Timeout(connect=3, read=5),
+                maxsize=1,
                 server_hostname=target.host,
                 assert_hostname=target.host,
                 cert_reqs="CERT_REQUIRED",
             )
         else:
-            pool = urllib3.HTTPConnectionPool(**options)
-        transport = [None]
+            pool = urllib3.HTTPConnectionPool(
+                host=target.ip,
+                port=target.port,
+                timeout=urllib3.Timeout(connect=3, read=5),
+                maxsize=1,
+            )
+        transport: list[socket.socket | None] = [None]
         deadline = time.monotonic() + REQUEST_SECONDS
         io_deadline = [deadline]
         finished, expired = Event(), Event()
         connection_base = pool.ConnectionCls
 
-        class TrackedConnection(connection_base):
-            def connect(self):
+        # urllib3 chooses its HTTP/HTTPS class at runtime. Preserve that choice and
+        # track the actual socket so the deadline watchdog can interrupt slow I/O.
+        class TrackedConnection(connection_base):  # type: ignore[valid-type,misc]
+            def connect(self) -> None:
                 super().connect()
                 # http.client may clear connection.sock for Connection: close
                 # while its response retains a buffered file on this socket.
@@ -126,7 +143,7 @@ class LimitedClient:
         client_task = self.task
         pool.ConnectionCls = TrackedConnection
 
-        def guard():
+        def guard() -> None:
             while not finished.wait(0.05):
                 cancelled = client_task.event.is_set()
                 if cancelled or time.monotonic() >= io_deadline[0]:
@@ -205,7 +222,7 @@ class LimitedClient:
             pool.close()
 
 
-def discover_forms(url, task=None):
+def discover_forms(url: str, task: TaskContext | None = None) -> Discovery:
 
     base = validate_url(url)
     reply = LimitedClient(task).request(base.url)
@@ -216,25 +233,33 @@ def discover_forms(url, task=None):
 
 def parse_forms(url: str, text: str) -> Discovery:
     from bs4 import BeautifulSoup
+    from bs4.element import Tag
+
+    def attribute(tag: Tag, name: str, default: str = "") -> str:
+        value = tag.get(name, default)
+        if not isinstance(value, str):
+            raise ValueError("Malformed form attribute.")
+        return value
 
     base = validate_url(url)
     soup = BeautifulSoup(text, "html.parser")
     forms, notes = [], []
     for number, element in enumerate(soup.find_all("form")[:20], 1):
         try:
-            action = validate_form_action(base, element.get("action", ""))
-            method = element.get("method", "GET").upper()
+            action = validate_form_action(base, attribute(element, "action"))
+            method = attribute(element, "method", "GET").upper()
             if method not in ("GET", "POST"):
                 raise ValueError("Unsupported form method.")
             if (
                 method == "POST"
-                and element.get("enctype", "application/x-www-form-urlencoded").lower()
+                and attribute(element, "enctype", "application/x-www-form-urlencoded").lower()
                 != "application/x-www-form-urlencoded"
             ):
                 raise ValueError("Only URL-encoded POST forms are supported.")
-            fields, probe_indices = [], []
+            fields: list[tuple[str, str]] = []
+            probe_indices: list[int] = []
             for control in element.find_all(["input", "textarea", "select"]):
-                name, kind = control.get("name"), control.get("type", "text").lower()
+                name, kind = attribute(control, "name"), attribute(control, "type", "text").lower()
                 if (
                     not name
                     or control.has_attr("disabled")
@@ -247,9 +272,15 @@ def parse_forms(url: str, text: str) -> Discovery:
                     value = control.get_text()
                 elif control.name == "select":
                     option = control.find("option", selected=True) or control.find("option")
-                    value = option.get("value", option.get_text()) if option else ""
+                    value = (
+                        attribute(option, "value", option.get_text())
+                        if isinstance(option, Tag)
+                        else ""
+                    )
                 else:
-                    value = control.get("value", "on" if kind in ("checkbox", "radio") else "")
+                    value = attribute(
+                        control, "value", "on" if kind in ("checkbox", "radio") else ""
+                    )
                 if len(fields) >= 100:
                     raise ValueError("Form contains too many fields (maximum 100).")
                 if kind not in ("hidden", "checkbox", "radio") and control.name != "select":
@@ -282,7 +313,7 @@ def content_similarity(first: str, second: str) -> float:
     # Comparing raw repetitive pages can otherwise require quadratic CPU time.
     width = max(1, math.ceil(max(len(first), len(second)) / 1024))
 
-    def fingerprints(text):
+    def fingerprints(text: str) -> list[bytes]:
         return [
             hashlib.blake2s(text[index : index + width].encode("utf-8"), digest_size=8).digest()
             for index in range(0, len(text), width)
@@ -291,7 +322,14 @@ def content_similarity(first: str, second: str) -> float:
     return SequenceMatcher(None, fingerprints(first), fingerprints(second)).ratio()
 
 
-def test_form(source_url, form, fields, owned=False, allow_post=False, task=None):
+def test_form(
+    source_url: str,
+    form: FormSpec,
+    fields: list[tuple[str, str]],
+    owned: bool = False,
+    allow_post: bool = False,
+    task: TaskContext | None = None,
+) -> list[Finding]:
     if not owned:
         raise ValueError(
             "Confirm ownership or permission to test this application before sending probes."
@@ -353,7 +391,7 @@ def readiness() -> str:
     return ""
 
 
-def create_panel(context):
+def create_panel(context: ToolsViewModel) -> QWidget:
     from frontend.views.tools import create_panel as factory
 
     return factory(MODULE.id, context)

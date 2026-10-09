@@ -1,3 +1,12 @@
+from __future__ import annotations
+
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from PyQt6.QtWidgets import QWidget
+
+    from frontend.viewmodels.tools_vm import ToolsViewModel
+
 import math
 from dataclasses import dataclass
 from functools import lru_cache
@@ -18,7 +27,7 @@ class PasswordReport:
 
 
 @lru_cache(maxsize=1)
-def common_passwords():
+def common_passwords() -> frozenset[str]:
     return frozenset(
         line.casefold() for line in resource_text("common_passwords.txt").splitlines() if line
     )
@@ -31,7 +40,7 @@ def analyze_password(password: str) -> PasswordReport:
         raise ValueError(
             "The estimator supports up to 72 characters. Input is never silently truncated."
         )
-    from zxcvbn import zxcvbn
+    from zxcvbn import zxcvbn  # type: ignore[import-untyped]
 
     estimate = zxcvbn(password)
     guesses = max(1.0, float(estimate["guesses"]))
@@ -52,7 +61,7 @@ def analyze_password(password: str) -> PasswordReport:
     )
 
 
-def format_time(seconds):
+def format_time(seconds: float) -> str:
     if seconds < 1:
         return f"{seconds:.3g} seconds"
     for divisor, unit in ((31557600, "years"), (86400, "days"), (3600, "hours"), (60, "minutes")):
@@ -71,7 +80,7 @@ def readiness() -> str:
     return ""
 
 
-def create_panel(context):
+def create_panel(context: ToolsViewModel) -> QWidget:
     from frontend.views.tools import create_panel as factory
 
     return factory(MODULE.id, context)

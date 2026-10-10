@@ -94,6 +94,8 @@ def _timeout(_number: int, _frame: FrameType | None) -> None:
 
 
 def main() -> int:
+    # JSONL v1 requires UTF-8 and literal LF regardless of the host locale.
+    sys.stdout.reconfigure(encoding="utf-8", newline="\n")
     parser = argparse.ArgumentParser(description="Saved capture JSONL worker; no live capture")
     parser.add_argument("path", nargs="?")
     parser.add_argument("--check", action="store_true")

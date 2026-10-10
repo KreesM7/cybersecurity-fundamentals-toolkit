@@ -55,6 +55,9 @@ class ModuleBrowser(QWidget):
         self.platform.addItems(
             ["", "windows", "linux", "unix", "multi", "osx", "android", "java", "php"]
         )
+        self.kind.setItemText(0, "All types")
+        self.rank.setItemText(0, "All ranks")
+        self.platform.setItemText(0, "All platforms")
         self.platform.setEditable(True)
         search = QPushButton("Search")
         for widget in (self.query, self.kind, self.rank, self.platform, search):
@@ -126,9 +129,9 @@ class ModuleBrowser(QWidget):
         self.output.appendPlainText("Searching…")
         self.vm.search_modules(
             self.query.text(),
-            self.kind.currentText(),
-            self.rank.currentText(),
-            self.platform.currentText(),
+            self.kind.currentText() if self.kind.currentIndex() != 0 else "",
+            self.rank.currentText() if self.rank.currentIndex() != 0 else "",
+            self.platform.currentText() if self.platform.currentText() != "All platforms" else "",
         )
 
     def select(self, current: QTreeWidgetItem | None, previous: QTreeWidgetItem | None) -> None:

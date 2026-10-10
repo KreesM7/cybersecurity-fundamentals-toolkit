@@ -22,10 +22,19 @@ def independent_ci_worker(monkeypatch):
         from backend.services import traffic_worker
 
         monkeypatch.setattr(traffic_worker, "is_windows", lambda: False)
+
+        def argv(arguments):
+            # Native Windows CI tests stdio framing and owned-process termination.
+            # Unix control sockets belong to the production Linux/WSL host and
+            # are exercised by Linux CI and the separate Windows WSL lab tests.
+            if sys.platform == "win32" and arguments[:1] == ["--control-token"]:
+                arguments = arguments[2:]
+            return [executable, "-m", "toolkit_scapy_worker", *arguments]
+
         monkeypatch.setattr(
             traffic_worker,
             "capture_worker_argv",
-            lambda arguments: [executable, "-m", "toolkit_scapy_worker", *arguments],
+            argv,
         )
 
 

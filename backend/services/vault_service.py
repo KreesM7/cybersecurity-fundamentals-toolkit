@@ -8,6 +8,8 @@ import hashlib
 import json
 import secrets
 import time
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 from dataclasses import dataclass
 from datetime import UTC, datetime
 from uuid import UUID, uuid4
@@ -20,7 +22,7 @@ from sqlalchemy import select
 
 from backend.events import EventHub
 from backend.models import EncryptedCredential, Target, VaultConfig
-from backend.services.workspace_service import WorkspaceService
+from backend.services.workspace_service import WorkspaceLease, WorkspaceService
 from shared.vault import (
     CredentialInput,
     CredentialList,
@@ -53,6 +55,9 @@ class VaultService:
         self._sessions: dict[UUID, Unlocked] = {}
         self._candidates: dict[UUID, dict[UUID, CredentialInput]] = {}
         self._lock = asyncio.Lock()
+        self._password_locks: dict[UUID, asyncio.Lock] = {}
+        self._failures: dict[UUID, tuple[int, float]] = {}
+        self._generation = 0
         self._reaper: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -135,42 +140,86 @@ class VaultService:
         async with self._lock:
             self._access(workspace_id, token)
 
+    def _check_generation(self, workspace_id: UUID, generation: int) -> None:
+        if generation != self._generation or workspace_id != self.workspaces.active_id:
+            raise VaultAccessError("Vault is locked. Unlock it again.")
+
+    @asynccontextmanager
+    async def _password_operation(
+        self, workspace_id: UUID
+    ) -> AsyncIterator[tuple[WorkspaceLease, int]]:
+        async with self._lock:
+            if workspace_id != self.workspaces.active_id:
+                raise VaultAccessError("Incorrect vault password or damaged vault.")
+            gate = self._password_locks.setdefault(workspace_id, asyncio.Lock())
+            generation = self._generation
+        async with gate, await self.workspaces.lease(workspace_id) as lease:
+            self._check_generation(workspace_id, generation)
+            yield lease, generation
+
+    @asynccontextmanager
+    async def _reauthenticate(
+        self, workspace_id: UUID, token: str, password: SecretStr
+    ) -> AsyncIterator[tuple[WorkspaceLease, Fernet]]:
+        async with self._password_operation(workspace_id) as (lease, generation):
+            async with self._lock:
+                self._access(workspace_id, token)
+            async with lease.sessions() as session:
+                config = await session.get(VaultConfig, 1)
+                if config is None:
+                    raise VaultAccessError("Vault is not initialized")
+            cipher = await self._verify(config, password)
+            async with self._lock:
+                self._check_generation(workspace_id, generation)
+                self._access(workspace_id, token)
+                yield lease, cipher
+
     async def unlock(
         self, workspace_id: UUID, password: SecretStr, *, initialize: bool = False
     ) -> VaultToken:
-        async with self._lock, await self.workspaces.lease(workspace_id) as lease:
-            if workspace_id != self.workspaces.active_id:
-                raise VaultAccessError("Select this workspace before unlocking its vault.")
-            async with lease.sessions.begin() as session:
+        async with self._password_operation(workspace_id) as (lease, generation):
+            _, retry_at = self._failures.get(workspace_id, (0, 0.0))
+            await asyncio.sleep(max(0, retry_at - time.monotonic()))
+            self._check_generation(workspace_id, generation)
+            async with lease.sessions() as session:
                 config = await session.get(VaultConfig, 1)
+            try:
                 if config is None:
                     if not initialize or len(password.get_secret_value()) < 12:
-                        raise VaultAccessError(
-                            "Initialize this vault with a passphrase of at least 12 characters."
-                        )
+                        raise VaultAccessError("Incorrect vault password or damaged vault.")
                     salt = secrets.token_bytes(32)
                     cipher = await asyncio.to_thread(self.derive, password, salt, ITERATIONS)
-                    session.add(
-                        VaultConfig(
-                            id=1,
-                            kdf="PBKDF2-HMAC-SHA256",
-                            parameters={"iterations": ITERATIONS, "length": 32},
-                            salt=salt,
-                            encrypted_check=cipher.encrypt(CHECK),
-                        )
-                    )
                 else:
                     cipher = await self._verify(config, password)
-            now = time.monotonic()
-            if workspace_id != self.workspaces.active_id:
-                raise VaultAccessError(
-                    "Workspace changed while unlocking. Unlock the selected vault."
+            except VaultAccessError:
+                async with self._lock:
+                    failures = min(self._failures.get(workspace_id, (0, 0.0))[0] + 1, 7)
+                    self._failures[workspace_id] = (
+                        failures,
+                        time.monotonic() + min(2 ** (failures - 1), 60),
+                    )
+                raise
+            async with self._lock:
+                self._check_generation(workspace_id, generation)
+                if config is None:
+                    async with lease.sessions.begin() as session:
+                        session.add(
+                            VaultConfig(
+                                id=1,
+                                kdf="PBKDF2-HMAC-SHA256",
+                                parameters={"iterations": ITERATIONS, "length": 32},
+                                salt=salt,
+                                encrypted_check=cipher.encrypt(CHECK),
+                            )
+                        )
+                self._check_generation(workspace_id, generation)
+                self._failures.pop(workspace_id, None)
+                now = time.monotonic()
+                token = secrets.token_urlsafe(32)
+                self._sessions[workspace_id] = Unlocked(
+                    cipher, hashlib.sha256(token.encode("utf-8")).digest(), now + 900, now
                 )
-            token = secrets.token_urlsafe(32)
-            self._sessions[workspace_id] = Unlocked(
-                cipher, hashlib.sha256(token.encode("utf-8")).digest(), now + 900, now
-            )
-            return VaultToken(token=token)
+                return VaultToken(token=token)
 
     @staticmethod
     def _encrypt(cipher: Fernet, value: CredentialInput) -> bytes:
@@ -257,13 +306,8 @@ class VaultService:
     async def reveal(
         self, workspace_id: UUID, token: str, identifier: UUID, password: SecretStr
     ) -> CredentialReveal:
-        async with self._lock, await self.workspaces.lease(workspace_id) as lease:
-            self._access(workspace_id, token)
+        async with self._reauthenticate(workspace_id, token, password) as (lease, cipher):
             async with lease.sessions() as session:
-                config = await session.get(VaultConfig, 1)
-                if config is None:
-                    raise VaultAccessError("Vault is not initialized")
-                cipher = await self._verify(config, password)
                 row = await session.get(EncryptedCredential, str(identifier))
                 if row is None:
                     raise KeyError("Credential not in this workspace")
@@ -288,15 +332,22 @@ class VaultService:
     ) -> None:
         if len(new_password.get_secret_value()) < 12:
             raise ValueError("Use a new passphrase with at least 12 characters")
-        async with self._lock, await self.workspaces.lease(workspace_id) as lease:
-            self._access(workspace_id, token)
-            async with lease.sessions.begin() as session:
+        async with self._password_operation(workspace_id) as (lease, generation):
+            async with self._lock:
+                self._access(workspace_id, token)
+            async with lease.sessions() as session:
                 config = await session.get(VaultConfig, 1)
                 if config is None:
                     raise VaultAccessError("Vault is not initialized")
-                previous = await self._verify(config, password)
-                salt = secrets.token_bytes(32)
-                replacement = await asyncio.to_thread(self.derive, new_password, salt, ITERATIONS)
+            previous = await self._verify(config, password)
+            salt = secrets.token_bytes(32)
+            replacement = await asyncio.to_thread(self.derive, new_password, salt, ITERATIONS)
+            async with self._lock, lease.sessions.begin() as session:
+                self._check_generation(workspace_id, generation)
+                self._access(workspace_id, token)
+                config = await session.get(VaultConfig, 1)
+                if config is None:
+                    raise VaultAccessError("Vault is not initialized")
                 rows = list(await session.scalars(select(EncryptedCredential)))
                 encrypted = [
                     (row, self._encrypt(replacement, self._decrypt(previous, row))) for row in rows
@@ -305,16 +356,11 @@ class VaultService:
                     row.ciphertext = ciphertext
                 config.salt = salt
                 config.encrypted_check = replacement.encrypt(CHECK)
-            self._discard(workspace_id)
+                self._discard(workspace_id)
 
     async def export(self, workspace_id: UUID, token: str, password: SecretStr) -> str:
-        async with self._lock, await self.workspaces.lease(workspace_id) as lease:
-            self._access(workspace_id, token)
+        async with self._reauthenticate(workspace_id, token, password) as (lease, cipher):
             async with lease.sessions() as session:
-                config = await session.get(VaultConfig, 1)
-                if config is None:
-                    raise VaultAccessError("Vault is not initialized")
-                cipher = await self._verify(config, password)
                 records = [
                     self._decrypt(cipher, row).transport_dump()
                     for row in await session.scalars(select(EncryptedCredential))
@@ -323,6 +369,7 @@ class VaultService:
 
     async def lock_all(self) -> None:
         async with self._lock:
+            self._generation += 1
             self._sessions.clear()
             self._candidates.clear()
             await self.events.publish("vault-locked", {"reason": "locked"})

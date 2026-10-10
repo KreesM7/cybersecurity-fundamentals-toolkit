@@ -9,3 +9,6 @@ Unlocking creates a random 256-bit opaque session token. Only its SHA-256 digest
 **Export plaintext** is a separate, confirmed action requiring reauthentication and a user-selected filename. It does not create a plaintext artifact inside the profile. Protect that intentionally unencrypted export yourself. Reports never include vault contents. RPC passwords use the OS keyring only when explicitly requested in Settings.
 
 Vault APIs require the normal instance Bearer token. Protected operations additionally require `X-Vault-Token`; neither token belongs in a URL. Shared contracts are in `shared/vault.py`. Reveal and export are read operations with uncached plaintext responses. Candidate and unlock replay records are memory-only. Accepted credential mutations persist only identifiers and status, never plaintext values. Locked or revoked access returns HTTP 423.
+
+Failed unlock attempts impose an in-memory, per-workspace retry cooldown of 1, 2, 4, 8, 16, 32, then 60 seconds. Success resets it. Cancelling a waiting request does not clear its cooldown. Password derivation runs outside the shared vault lock; a workspace-specific gate serializes password operations. Lock or workspace switch invalidates pending unlocks before they can grant access. Error responses do not disclose attempt counts or distinguish unknown workspaces from wrong passwords.
+

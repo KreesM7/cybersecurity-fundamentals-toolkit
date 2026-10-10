@@ -6,6 +6,7 @@ import asyncio
 from pathlib import Path
 
 from PyQt6.QtCore import QThread, pyqtSignal
+from PyQt6.QtWidgets import QApplication, QLabel
 
 from backend.bootstrap import (
     BackendInstance,
@@ -16,6 +17,19 @@ from backend.bootstrap import (
 )
 from backend.platform_utils import ProfileInUseError, acquire_profile_lease
 from backend.tls import TLSMaterial
+
+
+def finish_backend(backend: BackendThread, application: QApplication, status: QLabel) -> None:
+    """Keep Qt and the backend alive until all owned cleanup actually completes."""
+    backend.stop()
+    if not backend.isRunning():
+        return
+    application.setQuitOnLastWindowClosed(False)
+    status.setText("Closing Toolkit… Waiting for owned tasks to stop safely.")
+    status.show()
+    while not backend.wait(50):
+        application.processEvents()
+    status.hide()
 
 
 class BackendThread(QThread):

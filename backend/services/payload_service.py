@@ -16,14 +16,21 @@ from shared.payloads import PayloadCatalog, PayloadRequest
 
 
 async def run_generator(data: dict[str, object], context: JobContext) -> bytes:
-    process = await asyncio.create_subprocess_exec(
-        *payload_host_argv(),
-        stdin=asyncio.subprocess.PIPE,
-        stdout=asyncio.subprocess.PIPE,
-        stderr=asyncio.subprocess.PIPE,
-        limit=65536,
-        **hidden_process_options(),
+    spawn = asyncio.create_task(
+        asyncio.create_subprocess_exec(
+            *payload_host_argv(),
+            stdin=asyncio.subprocess.PIPE,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+            limit=65536,
+            **hidden_process_options(),
+        )
     )
+    try:
+        process = await asyncio.shield(spawn)
+    except asyncio.CancelledError:
+        context.cancel_event.set()
+        process = await _drain(spawn)
     assert process.stdin and process.stdout and process.stderr
 
     async def diagnostics() -> None:
@@ -40,6 +47,7 @@ async def run_generator(data: dict[str, object], context: JobContext) -> bytes:
     complete = False
     records = 0
     try:
+        context.check()
         process.stdin.write(json.dumps(data, allow_nan=False).encode() + b"\n")
         await process.stdin.drain()
         async with asyncio.timeout(100):
@@ -72,6 +80,20 @@ async def run_generator(data: dict[str, object], context: JobContext) -> bytes:
         process.stdin.close()
 
         async def reap() -> None:
+            stderr.cancel()
+            await asyncio.gather(stderr, return_exceptions=True)
+
+            async def discard(stream: asyncio.StreamReader) -> None:
+                while await stream.read(65536):
+                    pass
+
+            # A helper blocked writing a full pipe cannot observe stdin EOF or
+            # its watchdog. Drain both streams without retaining sensitive data.
+            drains = [
+                asyncio.create_task(discard(stream))
+                for stream in (process.stdout, process.stderr)
+                if stream is not None
+            ]
             try:
                 # EOF reaches the supervisor, which kills and reaps its own msfvenom group.
                 await asyncio.wait_for(process.wait(), 10)
@@ -79,8 +101,7 @@ async def run_generator(data: dict[str, object], context: JobContext) -> bytes:
                 # The independent supervisor has its own 90s watchdog; retain ownership until exit.
                 await asyncio.wait_for(process.wait(), 95)
             finally:
-                stderr.cancel()
-                await asyncio.gather(stderr, return_exceptions=True)
+                await asyncio.gather(*drains)
 
         await _drain(asyncio.create_task(reap()))
 

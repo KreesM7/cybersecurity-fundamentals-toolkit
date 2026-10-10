@@ -10,6 +10,7 @@ from uuid import UUID, uuid4
 
 from pydantic import JsonValue, TypeAdapter
 
+from backend.jobs import _drain
 from backend.platform_utils import hidden_process_options, run_process
 from backend.services.rpc_transport import RpcFailure
 
@@ -153,24 +154,46 @@ class PtyTransport:
 
     async def close(self) -> None:
         self.failed = True
+        await _drain(asyncio.create_task(self._close_owned()))
+
+    async def _close_owned(self) -> None:
+        async with self._lock:
+            await self._reap()
+
+    async def _reap(self) -> None:
         process = self.process
         if process is None:
             return
-        if process.returncode is None and self.cancel_argv:
-            await run_process(self.cancel_argv, timeout=5, max_output_bytes=65536)
         if process.stdin:
             process.stdin.close()
-        if process.returncode is None:
-            try:
-                await asyncio.wait_for(process.wait(), 10)
-            except TimeoutError:
-                if self.cancel_argv:
-                    raise RpcFailure(
-                        "Could not confirm owned PTY shutdown. Check Toolkit-MSF."
-                    ) from None
-                with suppress(ProcessLookupError):
-                    process.kill()
-                await process.wait()
         if self._stderr:
-            await self._stderr
+            self._stderr.cancel()
+            await asyncio.gather(self._stderr, return_exceptions=True)
+
+        async def discard(stream: asyncio.StreamReader) -> None:
+            while await stream.read(65536):
+                pass
+
+        drains = [
+            asyncio.create_task(discard(stream))
+            for stream in (process.stdout, process.stderr)
+            if stream is not None
+        ]
+        try:
+            if process.returncode is None and self.cancel_argv:
+                # Control-channel failure must never skip EOF, drains, or reaping.
+                with suppress(OSError, ValueError, RuntimeError, TimeoutError):
+                    await run_process(self.cancel_argv, timeout=5, max_output_bytes=65536)
+            if process.returncode is None:
+                try:
+                    await asyncio.wait_for(process.wait(), 10)
+                except TimeoutError:
+                    if not self.cancel_argv:
+                        with suppress(ProcessLookupError):
+                            process.kill()
+                    # The WSL host owns the child process group. Keep ownership
+                    # until its bounded startup/command loop observes EOF and exits.
+                    await process.wait()
+        finally:
+            await asyncio.gather(*drains)
         self.identity = None

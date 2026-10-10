@@ -115,5 +115,10 @@ class ArtifactService:
 
     async def read(self, workspace_id: UUID, identifier: UUID) -> bytes:
         # Hold the lease until bytes are read, so workspace deletion cannot race a download.
-        async with await self.workspaces.lease(workspace_id):
-            return await asyncio.to_thread((await self.get(workspace_id, identifier)).read_bytes)
+        async with await self.workspaces.lease(workspace_id) as lease:
+            content = await asyncio.to_thread((await self.get(workspace_id, identifier)).read_bytes)
+            async with lease.sessions() as session:
+                row = await session.get(Artifact, str(identifier))
+                if row is None or hashlib.sha256(content).hexdigest() != row.sha256:
+                    raise ValueError("Artifact is unavailable or changed")
+            return content

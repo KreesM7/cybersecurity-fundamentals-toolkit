@@ -14,7 +14,7 @@ from backend.bootstrap import InstanceLocator
 from backend.platform_utils import get_config_dir
 from backend.tls import TLSMaterial
 from frontend.main_window import MainWindow
-from frontend.runtime import BackendThread
+from frontend.runtime import BackendThread, finish_backend
 from frontend.theme import apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.tools.base import ToolPanel
@@ -105,8 +105,6 @@ def main(argv: list[str] | None = None) -> int:
         for model in models:
             if model.is_running:
                 model.close()
-        backend.stop()
-        if not backend.wait(15000):
-            raise RuntimeError("Backend shutdown timed out. Close owned jobs before retrying.")
+        finish_backend(backend, application, launcher)
         if temporary is not None:
             temporary.cleanup()

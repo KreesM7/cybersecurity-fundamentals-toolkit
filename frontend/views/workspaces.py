@@ -95,7 +95,9 @@ class WorkspacePanel(QWidget):
                 QMessageBox.question(
                     self,
                     "Delete workspace?",
-                    "Permanently delete this inactive workspace and its saved data?",
+                    "Permanently delete this inactive workspace and its saved data? "
+                    "Remote session/job associations will be lost; "
+                    "external activity keeps running.",
                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                     QMessageBox.StandardButton.No,
                 )

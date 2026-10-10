@@ -1,0 +1,11 @@
+.git
+.venv
+.worker
+work
+dist
+build
+__pycache__
+.env*
+*.pem
+*.key
+.superpowers

@@ -1,0 +1,9 @@
+Package: cybersecurity-fundamentals-toolkit
+Version: 2.0.0
+Section: education
+Priority: optional
+Architecture: amd64
+Maintainer: KreesM7 <noreply@users.noreply.github.com>
+Depends: libc6 (>= 2.39), libegl1, libopengl0, libxkbcommon0, libxcb-cursor0, libdbus-1-3
+Description: Desktop security fundamentals and local workspaces
+ Native Qt desktop with authenticated local API and separately installed native tools.

@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Cybersecurity Fundamentals Toolkit
+Comment=Local workspaces and security fundamentals tools
+Exec=CybersecurityFundamentalsToolkit
+Icon=toolkit
+Categories=Education;Development;
+Terminal=false

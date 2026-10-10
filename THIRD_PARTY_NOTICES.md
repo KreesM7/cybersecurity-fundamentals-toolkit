@@ -1,31 +1,25 @@
-# Third-party notices and release constraint
+# Dependency and distribution notices
 
-The root MIT license covers this project's original source and examples. It does not relicense dependencies or the bundled password corpus. This is a local source/build-recipe delivery. No combined executable, Nmap binary, capture driver, or libmagic binary is delivered for redistribution.
+Our original source is MIT licensed (LICENSE). The combined PyQt6/python-nmap desktop is distributed under GPLv3 (COPYING). This does not relicense third-party components; their original notices and applicable terms remain in force. No warranty is provided.
 
-## Requested direct dependencies
+## Distribution boundary
 
-| Package | Pinned version | Upstream license / source |
-|---|---|---|
-| PySide6-Essentials | 6.11.2 | [LGPL-3.0-only OR GPL-2.0-only OR GPL-3.0-only; Qt licensing choices apply](https://pypi.org/project/PySide6-Essentials/6.11.2/) |
-| Scapy | 2.8.0 | [GPL-2.0-only, upstream metadata](https://github.com/secdev/scapy/blob/v2.8.0/pyproject.toml) |
-| python-nmap | 0.7.1 | [GPL-3.0](https://pypi.org/project/python-nmap/0.7.1/) |
-| psutil | 7.2.2 | [BSD-3-Clause](https://pypi.org/project/psutil/7.2.2/) |
-| python-magic | 0.4.27 | [MIT; native libmagic is separate](https://pypi.org/project/python-magic/0.4.27/) |
-| zxcvbn | 4.5.0 | [MIT](https://pypi.org/project/zxcvbn/4.5.0/) |
-| urllib3 | 2.8.0 | [MIT](https://pypi.org/project/urllib3/2.8.0/) |
-| Beautiful Soup | 4.15.0 | [MIT](https://pypi.org/project/beautifulsoup4/4.15.0/) |
-| PyInstaller (build tool) | 6.22.3 | [GPL-2.0-or-later with the PyInstaller bootloader exception](https://pyinstaller.org/en/stable/license.html) |
+- PyQt6 6.11.0: GPLv3; PyQt6-sip 13.13.0 retains its wheel notices.
+- Qt 6.11.2: LGPLv3 and module-specific third-party licenses. Qt libraries remain separate dynamic libraries and can be replaced with compatible modified builds. Reverse engineering for debugging modifications to these libraries is permitted. Build instructions and corresponding sources accompany release assets.
+- python-nmap 0.7.1: GPLv3. The external Nmap executable is not bundled and has its own NPSL terms.
+- Scapy 2.8.0: GPL-2.0-only, installed independently in a separate worker environment. Neither Scapy nor its Python runtime is in the desktop installer. The worker is independently usable via the documented JSONL interface. Separation does not remove PyQt6/python-nmap GPLv3 obligations. GPLv2-only and GPLv3 code must not be linked together into this desktop.
+- Metasploit and its dependencies are independently installed in Toolkit-MSF or a native Linux environment; they are not included in desktop assets.
+- Native libmagic and its database are separately installed. The Python wrapper is included under MIT.
+- PyInstaller 6.22.3 includes its GPL exception for generated applications; that exception does not waive dependency terms. Inno Setup is a build tool, not an application dependency.
 
-**Unresolved binary redistribution issue:** Scapy's GPL-2.0-only and python-nmap's GPL-3.0 licenses cannot simply be treated as one compatible license for a combined application. Keeping both requested libraries and placing MIT on our source does not settle combined-binary obligations. Before releasing an executable, resolve the license compatibility/architecture question and comply with all dependencies' source, notice, linking, replacement, and other applicable requirements. PyInstaller's exception does not waive the licenses of libraries it packages. No legal clearance or public-distribution approval is claimed here.
+For each platform, `compliance/inventory.json` in the frozen folder records actual collected Python distributions, versions, native filenames, source URLs and source hashes. `compliance/licenses/` preserves installed notices, including vendored packages. The release source archives include original project files, Python dependency source distributions and Qt source. `uv.lock` records exact transitive dependency resolution; optional and development packages in the lock are not necessarily in the installer. Native runtime notices accompany the inventory. See docs/BUILD.md for reproducing and replacing components.
 
-Qt/PySide and Shiboken carry their own alternative licenses and third-party notices. Consult the actual installed distribution and Qt's licensing terms before redistribution; dynamic inclusion alone is not a complete compliance assessment. Nmap has [separate licensing terms](https://nmap.org/npsl/) beyond the Python wrapper; do not infer permission to bundle it from python-nmap's license.
+Relevant upstream terms: [PyQt](https://www.riverbankcomputing.com/software/pyqt/intro), [Qt](https://www.qt.io/licensing/open-source-lgpl-obligations), [PyInstaller](https://pyinstaller.org/en/stable/license.html), [Nmap](https://nmap.org/npsl/), [Scapy](https://github.com/secdev/scapy/blob/master/LICENSE).
 
-## Bundled common-password sample
+## Common-password sample
 
-`toolkit/resources/common_passwords.txt` contains the first 1,000 nonempty lines of Daniel Miessler's [SecLists `Passwords/Common-Credentials/10k-most-common.txt`](https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/10k-most-common.txt), obtained 2026-10-06. Upstream file Git blob SHA: `a93ea7f91f095b38728795ecd6ec731e59b8c112`. This is a public sample, not a comprehensive breach-password check. The exact upstream MIT notice is preserved in [`toolkit/resources/SECLISTS_LICENSE.txt`](toolkit/resources/SECLISTS_LICENSE.txt).
+`toolkit/resources/common_passwords.txt` contains the first 1,000 nonempty lines of Daniel Miessler's [SecLists common-password list](https://github.com/danielmiessler/SecLists/blob/master/Passwords/Common-Credentials/10k-most-common.txt), obtained 2026-10-06. Upstream Git blob: `a93ea7f91f095b38728795ecd6ec731e59b8c112`. The exact MIT notice is in `toolkit/resources/SECLISTS_LICENSE.txt`. This is a small public sample, not a comprehensive breach-password check.
 
-## Transitive and external components
+## Rebuilding or redistributing
 
-The local environment also installs Shiboken6 (same Qt license alternatives), soupsieve (MIT), typing-extensions (PSF-2.0), and build dependencies such as altgraph, pefile, pywin32-ctypes, packaging, setuptools, and pyinstaller-hooks-contrib. Preserve and review their actual distribution notices for any release. The direct pins do not freeze every transitive dependency; capture a tested build environment when preparing a release.
-
-External Windows libmagic DLL/database packages and their dependencies have separate licenses. The MSYS2 UCRT64 file package uses BSD-2-Clause; its dependency tree includes additional BSD, LGPL, and GCC runtime-exception terms. They are installed separately and are not included in this source delivery. Use the package manager to keep the DLL, database, and dependencies matched. Npcap/WinPcap are unnecessary for saved-file analysis; the toolkit does not ship either.
+Preserve LICENSE, COPYING, these notices, and the generated dependency notices. Provide matching corresponding source and build scripts alongside binaries, including modified dependency sources if changed. Preserve the independent Scapy boundary. Re-audit inventories after any dependency, platform, or packaging change. We do not assert legal clearance for a third party's modified distribution.

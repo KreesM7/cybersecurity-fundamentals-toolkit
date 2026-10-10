@@ -63,11 +63,12 @@ async def test_payload_job_streams_and_artifact_is_workspace_scoped(tmp_path, mo
             confirmed=True,
         )
         job = await service.generate(data, uuid4())
-        for _ in range(100):
-            snapshot = app.state.jobs.get(job.id, scope)
-            if snapshot.status in {"succeeded", "failed"}:
-                break
-            await asyncio.sleep(0.01)
+        async with asyncio.timeout(10):
+            while True:
+                snapshot = app.state.jobs.get(job.id, scope)
+                if snapshot.status in {"succeeded", "failed"}:
+                    break
+                await asyncio.sleep(0.01)
         assert snapshot.status == "succeeded", snapshot
         artifact = await app.state.artifacts.get(scope, snapshot.result["artifact_id"])
         assert artifact.read_bytes() == b"fixture-artifact"
@@ -128,10 +129,9 @@ async def test_payload_cancel_waits_for_owned_process_and_keeps_no_artifact(tmp_
     hub = EventHub()
     context = JobContext(Event(), hub, uuid4(), uuid4())
     task = asyncio.create_task(payload_service.run_generator({}, context))
-    for _ in range(100):
-        if hub.recent:
-            break
-        await asyncio.sleep(0.01)
+    async with asyncio.timeout(10):
+        while not hub.recent:
+            await asyncio.sleep(0.01)
     task.cancel()
     with pytest.raises(asyncio.CancelledError):
         await task

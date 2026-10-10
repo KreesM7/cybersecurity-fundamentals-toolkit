@@ -47,7 +47,8 @@ jobs:
             WORKER="$PWD/.worker/bin/python"
           fi
           "$WORKER" -m pip install ./worker
-          echo "TOOLKIT_TEST_WORKER=$WORKER" >> "$GITHUB_ENV"
+          NATIVE_WORKER=$("$WORKER" -c "import sys; print(sys.executable)")
+          echo "TOOLKIT_TEST_WORKER=$NATIVE_WORKER" >> "$GITHUB_ENV"
       - name: Regression and coverage
         run: python -m uv run --no-sync pytest --cov --cov-report=xml --cov-report=term -v
       - name: Fresh profile startup

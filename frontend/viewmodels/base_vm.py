@@ -11,6 +11,7 @@ import httpx
 from pydantic import BaseModel
 from PyQt6.QtCore import QObject, QThread, pyqtSignal, pyqtSlot
 
+from backend.redaction import Redactor
 from frontend.api_client import MAX_UPLOAD_BYTES, ApiClient, ApiError, validate_connection
 from frontend.ws_client import WebSocketClient
 from shared.schemas import HealthResponse, SchemaModel
@@ -117,8 +118,8 @@ class ClientWorker(QThread):
         except asyncio.CancelledError:
             raise
         except ApiError as exc:
-            self.request_failed.emit(request_id, str(exc))
-            self.failed.emit(str(exc))
+            self.request_failed.emit(request_id, Redactor().text(str(exc)))
+            self.failed.emit(Redactor().text(str(exc)))
         except Exception as exc:
             self.request_failed.emit(request_id, f"Backend action failed ({type(exc).__name__})")
             self.failed.emit(f"Backend action failed ({type(exc).__name__})")
@@ -170,8 +171,8 @@ class ClientWorker(QThread):
         except asyncio.CancelledError:
             raise
         except ApiError as exc:
-            self.request_failed.emit(request_id, str(exc))
-            self.failed.emit(str(exc))
+            self.request_failed.emit(request_id, Redactor().text(str(exc)))
+            self.failed.emit(Redactor().text(str(exc)))
         except OSError:
             self.request_failed.emit(
                 request_id, "Selected file could not be read. Choose a readable regular file."

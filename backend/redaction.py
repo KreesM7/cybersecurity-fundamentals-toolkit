@@ -2,22 +2,30 @@
 
 from __future__ import annotations
 
+import logging
 import re
+import traceback
 from collections import Counter
+from typing import Any
 
 from pydantic import JsonValue
 
 REDACTED = "[REDACTED]"
-_KEY = re.compile(
-    r"(?:password|passwd|passphrase|secret|authorization|private_key|ntlm|smbpass|"
-    r"(?:^|_)token(?:$|_)|api_key|access_key|credential_value)",
-    re.IGNORECASE,
+_NAME = (
+    r"[A-Za-z0-9_]*(?:password|passwd|passphrase|secret|authorization|private_key|"
+    r"ntlm|smbpass|sshpass|dbpass|pass|token|api[_-]key|access_key|credential_value)"
+    r"[A-Za-z0-9_]*"
 )
-_ASSIGNMENT = re.compile(
-    r"(?im)(\b(?:password|passwd|passphrase|smbpass|sshpass|dbpass|secret|"
-    r"access_token|api_key|authorization)[ \t]*[:=][ \t]*)([^\r\n]*)"
+_KEY = re.compile(r"(?<![A-Za-z0-9])" + _NAME + r"(?![A-Za-z0-9_])", re.IGNORECASE)
+_ASSIGNMENT = re.compile(r"(?im)((?<![A-Za-z0-9])" + _NAME + r"[ \t]*[:=][ \t]*)([^\r\n]*)")
+_SET = re.compile(r"(?im)((?<![A-Za-z0-9])setg?[ \t]+" + _NAME + r"[ \t]+)([^\r\n]*)")
+_JSON = re.compile(r'(?i)("' + _NAME + r'"\s*:\s*)"(?:\\.|[^"\\])*"')
+_USERINFO = re.compile(r"://[^/@\s]+:[^/@\s]+@")
+_HEADERS = re.compile(
+    r"(?im)((?<![A-Za-z0-9_-])(?:Cookie|Set-Cookie|X-Vault-Token|X-Api-Key)"
+    r"[ \t]*:[ \t]*)[^\r\n]*"
 )
-_SET = re.compile(r"(?im)(\bsetg?[ \t]+\S*(?:pass|password|token|secret|key)[ \t]+)([^\r\n]*)")
+_JWT = re.compile(r"(?<![A-Za-z0-9_-])eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+")
 _BEARER = re.compile(r"(?i)(\bBearer[ \t]+)[A-Za-z0-9._~+/=-]+")
 _PRIVATE_KEY = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"
@@ -50,7 +58,10 @@ class Redactor:
             bounded = bounded.replace(secret, REDACTED)
         bounded = _PRIVATE_KEY.sub(REDACTED, bounded)
         bounded = _NTLM_PAIR.sub(REDACTED, bounded)
-        for pattern in (_SET, _ASSIGNMENT, _BEARER):
+        bounded = _JWT.sub(REDACTED, bounded)
+        bounded = _USERINFO.sub("://" + REDACTED + "@", bounded)
+        bounded = _JSON.sub(lambda match: match.group(1) + '"' + REDACTED + '"', bounded)
+        for pattern in (_HEADERS, _SET, _ASSIGNMENT, _BEARER):
             bounded = pattern.sub(lambda match: match.group(1) + REDACTED, bounded)
         return bounded[:10000]
 
@@ -68,3 +79,27 @@ class Redactor:
 
     def clear(self) -> None:
         self._secrets.clear()
+
+
+def install_logging_redaction() -> None:
+    """Sanitize records before any handler formats messages or exception tracebacks."""
+    previous = logging.getLogRecordFactory()
+    if getattr(previous, "toolkit_redaction", False):
+        return
+    redactor = Redactor()
+
+    def factory(*args: Any, **kwargs: Any) -> logging.LogRecord:
+        record = previous(*args, **kwargs)
+        record.msg = redactor.text(record.getMessage())
+        record.args = ()
+        if record.exc_info:
+            record.exc_text = redactor.text("".join(traceback.format_exception(*record.exc_info)))
+            record.exc_info = None
+        elif record.exc_text:
+            record.exc_text = redactor.text(record.exc_text)
+        if record.stack_info:
+            record.stack_info = redactor.text(record.stack_info)
+        return record
+
+    setattr(factory, "toolkit_redaction", True)
+    logging.setLogRecordFactory(factory)

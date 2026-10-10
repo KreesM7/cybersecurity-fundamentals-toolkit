@@ -24,6 +24,7 @@ from backend.mutations import (
     MutationCoordinator,
     UnknownOutcomeError,
 )
+from backend.redaction import Redactor, install_logging_redaction
 from backend.request_limits import RequestBodyLimit
 from backend.routers import (
     activity,
@@ -79,6 +80,7 @@ def create_app(
     allowed_origins: set[str] | None = None,
 ) -> FastAPI:
     """Build a protected app; bootstrap supplies its reserved loopback TLS socket."""
+    install_logging_redaction()
     if not instance_id:
         raise ValueError("Instance identity is required")
 
@@ -197,7 +199,7 @@ def create_app(
                 422,
                 "Invalid operation or input. Check the selected workspace and fields.",
             )
-        return JSONResponse({"detail": detail}, status_code=status)
+        return JSONResponse({"detail": Redactor().text(detail)}, status_code=status)
 
     for exception in (
         MutationConflictError,

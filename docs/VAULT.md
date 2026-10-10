@@ -1,6 +1,6 @@
 # Credential vault
 
-Each workspace has an independent vault. Initialize it with a master passphrase of at least 12 characters. The master passphrase is never saved. Fernet encrypts the complete credential record; PBKDF2-HMAC-SHA256 uses 600,000 iterations, a random 32-byte salt and a 32-byte derived key. KDF parameters and the encrypted verification marker are stored beside ciphertext.
+Each workspace has an independent vault. Initialize it with a master passphrase of at least 12 characters. The master passphrase is never saved. Fernet encrypts the complete credential record. New vaults use Argon2id v19 with 19,456 KiB (19 MiB) memory, two iterations, one lane, a random 32-byte salt and a 32-byte derived key. KDF parameters and the encrypted verification marker are stored beside ciphertext.
 
 Unlocking creates a random 256-bit opaque session token. Only its SHA-256 digest is held in the workspace-bound server session and comparisons are constant-time. Its maximum lifetime is 15 minutes; five minutes without a protected vault operation locks the vault sooner. Status polling does not count as activity. Lock, workspace switch, password change and application shutdown revoke access and discard keys and temporary candidates. Python does not guarantee physical zeroization of all previously allocated immutable memory.
 
@@ -12,3 +12,10 @@ Vault APIs require the normal instance Bearer token. Protected operations additi
 
 Failed unlock attempts impose an in-memory, per-workspace retry cooldown of 1, 2, 4, 8, 16, 32, then 60 seconds. Success resets it. Cancelling a waiting request does not clear its cooldown. Password derivation runs outside the shared vault lock; a workspace-specific gate serializes password operations. Lock or workspace switch invalidates pending unlocks before they can grant access. Error responses do not disclose attempt counts or distinguish unknown workspaces from wrong passwords.
 
+## KDF migration and benchmark
+
+The fixed Argon2id parameters follow the [OWASP minimum configuration](https://cheatsheetseries.owasp.org/cheatsheets/Password_Storage_Cheat_Sheet.html). At most two native derivations run concurrently; cancellation retains its slot until the native call finishes. Stored parameters are validated before derivation to reject unsupported or excessive costs.
+
+Existing PBKDF2-HMAC-SHA256 vaults with 600,000 iterations remain readable. Successful unlock first creates an owner-only SQLite backup named workspace.pre-argon2-<random>.db (including committed WAL contents), then re-encrypts every credential and the check marker with a fresh Argon2id salt in one transaction. Backup, encryption or commit failure leaves the old vault intact. Wrong passwords never migrate. The encrypted backup retains its old password; keep it protected and remove it only after independently verifying the migrated vault. No user vault was used in migration tests: tests build legacy fixtures and open separate copies, preserving the originals.
+
+Run python scripts/benchmark_vault.py to measure one warmup followed by 20 derivations. CI records median, p95 and maximum on Windows/Ubuntu and Python 3.11/3.12; p95 must remain below 300 ms. Local Windows 11 / Python 3.12.14 measured median 17.516 ms, p95 18.344 ms and maximum 21.918 ms. These are measurements, not a latency guarantee for every computer.

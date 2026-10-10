@@ -163,11 +163,11 @@ class ConsoleHistory(WorkspaceBase):
 
 
 class VaultConfig(WorkspaceBase):
-    """Future vault KDF/check configuration; encryption is intentionally implemented later."""
+    """Versioned vault KDF parameters and encrypted password-verification marker."""
 
     __tablename__ = "vault_config"
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
-    kdf: Mapped[str] = mapped_column(String(50))
+    kdf: Mapped[str] = mapped_column(String(50), default="Argon2id")
     parameters: Mapped[dict[str, object]] = mapped_column(JSON)
     salt: Mapped[bytes] = mapped_column(LargeBinary)
     encrypted_check: Mapped[bytes] = mapped_column(LargeBinary)

@@ -151,5 +151,11 @@ async def test_vault_api_revokes_on_switch_and_never_replays_plaintext(tmp_path)
         async with await app.state.workspaces.lease(scope) as lease:
             async with lease.sessions() as session:
                 config = (await session.scalars(select(VaultConfig))).one()
-                assert len(config.salt) == 32 and config.parameters["iterations"] == 600000
+                assert len(config.salt) == 32 and config.kdf == "Argon2id"
+                assert config.parameters == {
+                    "memory_cost": 19456,
+                    "time_cost": 2,
+                    "parallelism": 1,
+                    "length": 32,
+                }
     assert not any(b"protected-secret" in path.read_bytes() for path in tmp_path.rglob("*.db"))

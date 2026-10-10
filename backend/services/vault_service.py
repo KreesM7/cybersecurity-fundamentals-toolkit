@@ -7,13 +7,17 @@ import base64
 import hashlib
 import json
 import secrets
+import sqlite3
 import time
 from collections.abc import AsyncIterator
-from contextlib import asynccontextmanager
+from contextlib import asynccontextmanager, closing
 from dataclasses import dataclass
 from datetime import UTC, datetime
+from pathlib import Path
+from typing import TypeVar
 from uuid import UUID, uuid4
 
+from argon2.low_level import Type, hash_secret_raw
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
@@ -22,6 +26,7 @@ from sqlalchemy import select
 
 from backend.events import EventHub
 from backend.models import EncryptedCredential, Target, VaultConfig
+from backend.platform_utils import assert_private_path, atomic_private_write
 from backend.services.workspace_service import WorkspaceLease, WorkspaceService
 from shared.vault import (
     CredentialInput,
@@ -34,7 +39,26 @@ from shared.vault import (
 )
 
 ITERATIONS = 600000
+ARGON2_PARAMETERS = {"memory_cost": 19456, "time_cost": 2, "parallelism": 1, "length": 32}
 CHECK = b"toolkit-vault-v1"
+_T = TypeVar("_T")
+
+
+async def _await_native(task: asyncio.Task[_T]) -> _T:
+    """Retain native-work ownership even after repeated cancellation requests."""
+    try:
+        return await asyncio.shield(task)
+    except asyncio.CancelledError:
+        while not task.done():
+            try:
+                await asyncio.shield(task)
+            except asyncio.CancelledError:
+                continue
+            except Exception:
+                break
+        if not task.cancelled():
+            task.exception()
+        raise
 
 
 class VaultAccessError(ValueError):
@@ -58,6 +82,7 @@ class VaultService:
         self._password_locks: dict[UUID, asyncio.Lock] = {}
         self._failures: dict[UUID, tuple[int, float]] = {}
         self._generation = 0
+        self._derivations = asyncio.Semaphore(2)
         self._reaper: asyncio.Task[None] | None = None
 
     async def start(self) -> None:
@@ -88,19 +113,87 @@ class VaultService:
         ).derive(password.get_secret_value().encode("utf-8"))
         return Fernet(base64.urlsafe_b64encode(key))
 
-    async def _verify(self, config: VaultConfig, password: SecretStr) -> Fernet:
-        if config.kdf != "PBKDF2-HMAC-SHA256" or config.parameters != {
-            "iterations": ITERATIONS,
-            "length": 32,
-        }:
+    @staticmethod
+    def derive_argon2id(password: SecretStr, salt: bytes) -> Fernet:
+        if len(salt) != 32:
             raise VaultAccessError("Vault parameters are invalid; restore a verified backup.")
-        cipher = await asyncio.to_thread(self.derive, password, config.salt, ITERATIONS)
+        key = hash_secret_raw(
+            password.get_secret_value().encode("utf-8"),
+            salt,
+            time_cost=2,
+            memory_cost=19456,
+            parallelism=1,
+            hash_len=32,
+            type=Type.ID,
+        )
+        return Fernet(base64.urlsafe_b64encode(key))
+
+    async def _derive(self, password: SecretStr, salt: bytes, *, legacy: bool = False) -> Fernet:
+        async with self._derivations:
+            task = asyncio.create_task(
+                asyncio.to_thread(self.derive, password, salt, ITERATIONS)
+                if legacy
+                else asyncio.to_thread(self.derive_argon2id, password, salt)
+            )
+            # Cancellation must not free a slot while its native KDF still owns memory.
+            return await _await_native(task)
+
+    async def _verify(self, config: VaultConfig, password: SecretStr) -> Fernet:
+        legacy = config.kdf == "PBKDF2-HMAC-SHA256"
+        expected = {"iterations": ITERATIONS, "length": 32} if legacy else ARGON2_PARAMETERS
+        if config.kdf not in {"PBKDF2-HMAC-SHA256", "Argon2id"} or config.parameters != expected:
+            raise VaultAccessError("Vault parameters are invalid; restore a verified backup.")
+        cipher = await self._derive(password, config.salt, legacy=legacy)
         try:
             if not secrets.compare_digest(cipher.decrypt(config.encrypted_check), CHECK):
                 raise VaultAccessError("Incorrect vault password or damaged vault.")
         except InvalidToken as exc:
             raise VaultAccessError("Incorrect vault password or damaged vault.") from exc
         return cipher
+
+    @staticmethod
+    def _backup_vault(path: Path) -> None:
+        """Snapshot SQLite (including WAL) into an owner-only, encrypted old-format backup."""
+        assert_private_path(path)
+        backup = path.with_name(f"{path.stem}.pre-argon2-{uuid4().hex}.db")
+        atomic_private_write(backup, b"")
+        try:
+            with closing(sqlite3.connect(path.as_uri() + "?mode=ro", uri=True)) as source:
+                with closing(sqlite3.connect(backup)) as destination:
+                    source.backup(destination)
+                    if destination.execute("PRAGMA quick_check").fetchone() != ("ok",):
+                        raise VaultAccessError("Vault backup failed; migration cancelled.")
+            assert_private_path(backup)
+        except BaseException:
+            backup.unlink(missing_ok=True)
+            raise
+
+    async def _migrate_legacy(
+        self, lease: WorkspaceLease, generation: int, password: SecretStr, previous: Fernet
+    ) -> Fernet:
+        salt = secrets.token_bytes(32)
+        replacement = await self._derive(password, salt)
+        database = lease.engine.url.database
+        if database is None:
+            raise VaultAccessError("Vault backup failed; migration cancelled.")
+        backup = asyncio.create_task(asyncio.to_thread(self._backup_vault, Path(database)))
+        await _await_native(backup)
+        async with self._lock, lease.sessions.begin() as session:
+            self._check_generation(lease.workspace_id, generation)
+            config = await session.get(VaultConfig, 1)
+            if config is None or config.kdf != "PBKDF2-HMAC-SHA256":
+                raise VaultAccessError("Vault changed while unlocking. Unlock it again.")
+            rows = list(await session.scalars(select(EncryptedCredential)))
+            encrypted = [
+                (row, self._encrypt(replacement, self._decrypt(previous, row))) for row in rows
+            ]
+            for row, ciphertext in encrypted:
+                row.ciphertext = ciphertext
+            config.kdf = "Argon2id"
+            config.parameters = dict(ARGON2_PARAMETERS)
+            config.salt = salt
+            config.encrypted_check = replacement.encrypt(CHECK)
+        return replacement
 
     def _discard(self, workspace_id: UUID) -> None:
         self._sessions.pop(workspace_id, None)
@@ -188,7 +281,7 @@ class VaultService:
                     if not initialize or len(password.get_secret_value()) < 12:
                         raise VaultAccessError("Incorrect vault password or damaged vault.")
                     salt = secrets.token_bytes(32)
-                    cipher = await asyncio.to_thread(self.derive, password, salt, ITERATIONS)
+                    cipher = await self._derive(password, salt)
                 else:
                     cipher = await self._verify(config, password)
             except VaultAccessError:
@@ -199,6 +292,8 @@ class VaultService:
                         time.monotonic() + min(2 ** (failures - 1), 60),
                     )
                 raise
+            if config is not None and config.kdf == "PBKDF2-HMAC-SHA256":
+                cipher = await self._migrate_legacy(lease, generation, password, cipher)
             async with self._lock:
                 self._check_generation(workspace_id, generation)
                 if config is None:
@@ -206,8 +301,8 @@ class VaultService:
                         session.add(
                             VaultConfig(
                                 id=1,
-                                kdf="PBKDF2-HMAC-SHA256",
-                                parameters={"iterations": ITERATIONS, "length": 32},
+                                kdf="Argon2id",
+                                parameters=dict(ARGON2_PARAMETERS),
                                 salt=salt,
                                 encrypted_check=cipher.encrypt(CHECK),
                             )
@@ -341,7 +436,7 @@ class VaultService:
                     raise VaultAccessError("Vault is not initialized")
             previous = await self._verify(config, password)
             salt = secrets.token_bytes(32)
-            replacement = await asyncio.to_thread(self.derive, new_password, salt, ITERATIONS)
+            replacement = await self._derive(new_password, salt)
             async with self._lock, lease.sessions.begin() as session:
                 self._check_generation(workspace_id, generation)
                 self._access(workspace_id, token)
@@ -355,6 +450,8 @@ class VaultService:
                 for row, ciphertext in encrypted:
                     row.ciphertext = ciphertext
                 config.salt = salt
+                config.kdf = "Argon2id"
+                config.parameters = dict(ARGON2_PARAMETERS)
                 config.encrypted_check = replacement.encrypt(CHECK)
                 self._discard(workspace_id)
 

@@ -1,10 +1,29 @@
 # Cybersecurity Fundamentals Toolkit
 
-One native desktop application for seven learning and inspection tools. The v2 source uses Python3.11/3.12, PyQt6 and a private authenticated HTTPS backend inside the desktop process. Workspace data is stored locally; entered passwords and automatic analysis results stay in memory. There is no live packet capture or telemetry. The text sidebar stays available while background work runs. The v2 release is still being implemented; the handoff describes remaining features, not a completed release.
+One native desktop application with seven fundamentals tools, local workspaces, Metasploit integration, an encrypted credential vault, and reports. Python 3.11/3.12, PyQt6, and a private authenticated HTTPS/WSS backend run in one desktop process. Errors remain local; no telemetry is enabled.
+
+**Quick start:** install the unsigned Windows x64 package from [Releases](https://github.com/KreesM7/cybersecurity-fundamentals-toolkit/releases), then open **Cybersecurity Fundamentals Toolkit** from Start. Python is included. Alternatively, extract the entire portable ZIP and run its executable. The Linux AppImage targets Ubuntu 24.04+ x86_64. Nmap, libmagic, and Toolkit-MSF are separate optional prerequisites; setup messages identify affected tools.
+
+![Toolkit dashboard](docs/screenshots/dashboard.png)
+
+The desktop backend listens only on loopback. This does **not** restrict authorized scan/web targets to localhost: the scanner accepts bounded IPv4 targets, and the SQL checker accepts validated local/public URLs. You must explicitly confirm testing permission. Traffic analysis reads saved files; there is no live capture or DoS traffic generation.
+
+## V2 features
+
+| Area | Guide |
+|---|---|
+| Workspaces, targets, Nmap XML, sessions/jobs and console | [Workspace and activity guide](docs/ACTIVITY_AND_WORKSPACES.md) |
+| Dedicated RPC installation and verified TLS | [Toolkit-MSF setup](docs/MSFRPC_SETUP.md) |
+| Independently supervised PTY fallback | [PTY guide](docs/PTY_FALLBACK.md) |
+| Module search, metadata/options, favorites and target transfer | [Module browser](docs/MODULE_BROWSER.md) |
+| Payload generation, streaming progress, cancellation and Save As | [Payload guide](docs/PAYLOAD_GENERATION.md) |
+| Encrypted vault, temporary candidates and explicit acceptance | [Vault guide](docs/VAULT.md) |
+| Escaped reports; optional PDF with HTML fallback | [Reports](docs/REPORTS.md) |
+| Themes, onboarding, shortcuts and optional update banner | [Desktop controls](docs/DESKTOP.md) |
 
 ## Setup and run
 
-Install **64-bit Python 3.12**. Open PowerShell in this project directory:
+For source installation, install **64-bit Python 3.12 or 3.11**. The packaged Windows app does not need a separate Python installation. Open PowerShell in this project directory:
 
 ```powershell
 py -3.12 -m venv .venv
@@ -36,7 +55,7 @@ if ($LASTEXITCODE -ne 0) { throw 'Package installation failed. Resolve the error
 
 The displayed version must be Python 3.12. The Codex cache path may change after an app update; a regular Python installation is the portable setup option.
 
-All direct dependency pins, including the build tool, live in `requirements.txt`. Home reports readiness for each module. Missing Python or native components affect the corresponding module; the shell still opens. Click Home again to refresh readiness after changing setup. Restart after changing DLL paths.
+Dependency pins live in `pyproject.toml`; `requirements.txt` installs the project and development/build extras. For reproducible builds use the transitive `uv.lock` as documented in [BUILD](docs/BUILD.md). Dashboard shows readiness; missing optional native components affect only their tools. Click Refresh health after setup. Restart after changing DLL paths. Core Qt/API dependencies are required to launch.
 
 ## Use the modules
 
@@ -115,53 +134,33 @@ python -m toolkit
 
 Use one distribution/version for the DLL and database; keep dependent DLLs beside it. The wrapper recognizes `libmagic-1.dll`, among other standard names. Do not mix 32/64-bit files. If setup fails, the module displays instructions while the remaining toolkit opens. See [python-magic's installation notes](https://pypi.org/project/python-magic/). This delivery does not redistribute Nmap, libmagic, or MSYS2 native packages.
 
-## Tests and local packaging
+## Verification, packaging and extensions
 
-Run the complete unittest command above. Tests use generated inputs and temporary loopback HTTP servers. Public-address and hostname behavior uses controlled DNS/transport fixtures; no real public target is contacted. Qt tests use the offscreen platform and check all panels, custom routing, permission resets, worker delivery on the main thread, responsiveness, cancellation, shutdown, dependency failure isolation, discovery, and resources from another working directory. The real renamed-PNG test skips with a stated reason if external libmagic is absent. Set up libmagic as above to run it. Local socket restrictions in a managed execution environment may need permission for the loopback fixture.
+The complete v2 suite uses `python -m pytest --cov --cov-report=xml`; `python -m unittest discover -s tests -v` remains the original fundamentals suite. CI enforces Black, Ruff, strict mypy and at least 75% coverage on Windows/Linux × Python 3.11/3.12. Tests use controlled local fixtures. Optional native-lab skips are identified explicitly; a skip does not establish readiness. See [verification](docs/VERIFICATION.md) and [independent security review](docs/SECURITY_REVIEW.md).
 
-For a **local Windows x64 build**, use the same Python 3.12 environment:
+Build unsigned Windows installers/portable folders and Linux AppImages using [BUILD](docs/BUILD.md). Our source is MIT; the combined PyQt6/python-nmap desktop follows GPLv3. Scapy is an independently installed GPL-2.0-only worker and is excluded from the desktop. Source archives, notices and checksums accompany release assets; see [third-party notices](THIRD_PARTY_NOTICES.md).
 
-```powershell
-python -m PyInstaller --noconfirm --clean toolkit.spec
-.\dist\CybersecurityFundamentalsToolkit\CybersecurityFundamentalsToolkit.exe
+See [extension interfaces](docs/EXTENDING.md), [API authentication](docs/API.md), [security policy](SECURITY.md), and [contributing](CONTRIBUTING.md). Git history records actual verified slices and is published in this repository. No Sentry telemetry is configured.
+
+## Linux prerequisites
+
+On Ubuntu 24.04+ x86_64 install Qt host libraries before using the AppImage:
+
+```sh
+sudo apt-get install libegl1 libopengl0 libxkbcommon0 libxcb-cursor0 libdbus-1-3 libgtk-3-0t64 libxcb-xinerama0 libxkbcommon-x11-0
+chmod +x Toolkit-2.0.0-Linux-x86_64.AppImage
+./Toolkit-2.0.0-Linux-x86_64.AppImage --appimage-extract-and-run
 ```
 
-The spec uses windowed mode and one folder, automatically collects discovered modules and bundled resources, and copies examples/notices. New modules are collected on rebuild. External Nmap and libmagic setup is still required. On Windows the spec limits native DLL discovery to the selected Python and Windows system directories, avoiding unrelated DLLs on PATH (in particular incompatible third-party ICU copies). Qt uses Windows' system ICU. `python -m toolkit --self-test` and the corresponding executable `--self-test` return exit code 0 after checking panel creation and bundled-resource access without opening a window. They do not perform active scans or probes.
+Install `nmap` and `libmagic1t64` for those tools. The AppImage includes Python and Qt, but requires Ubuntu host libraries and a desktop display. Headless verification uses `QT_QPA_PLATFORM=offscreen` and `--self-test`. See the build guide for FUSE-free execution and the Debian skeleton.
 
-**Executable distribution is a later release step.** The requested Scapy GPL-2.0-only and python-nmap GPL-3.0 components create an unresolved combined-binary licensing issue. A local successful build does not resolve it. See [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md) before any redistribution; the MIT license applies only to our source. Signing, installer production, distribution licensing, and native binary inclusion are not part of this delivery.
+## Data and troubleshooting
 
-## Add a module
+Windows profiles live under `%APPDATA%\CybersecurityFundamentalsToolkit`; Linux uses `~/.cybersecurity-fundamentals-toolkit`. A `TOOLKIT_PROFILE` override selects an isolated profile. Back up the complete profile while the app is closed, including `mutation.key`, workspace databases and vault metadata. Never share the instance token, TLS keys or vault data in an issue. There is no forgotten-password recovery for the vault.
 
-Create one new `.py` file in `toolkit/modules/` (names starting `_` are ignored). Separate ordinary analysis functions and result dataclasses from lazy Qt panel creation in that file:
+Analysis results and entered strength-check passwords stay in memory. Workspace records, explicitly accepted vault credentials, managed payload/report artifacts and settings persist locally. Reports and exported files are user-managed copies. Python/Qt cannot guarantee physical erasure of freed memory. Closing may briefly display a waiting message while owned helpers finish cleanup; external RPC servers remain running.
 
-```python
-from dataclasses import dataclass
-from toolkit.core import ModuleSpec
-
-@dataclass
-class Result:
-    value: str
-
-def analyze(value, task):
-    task.check()
-    task.report('Analyzing...')
-    return Result(value.upper())
-
-def create_panel(context):
-    from toolkit.widgets import TaskPanel
-    panel = TaskPanel(context, 'Example', 'Description of this local tool.')
-    panel.add_footer()
-    panel.run_button.clicked.connect(lambda: panel.start(
-        lambda task: analyze('example', task),
-        lambda result: panel.status.setText(result.value)))
-    return panel
-
-MODULE = ModuleSpec('example', 'Example', 80, create_panel)
-```
-
-Optionally define `readiness()` returning an actionable message or `''` for ready. Import optional libraries inside analysis/readiness; import Qt panel helpers inside the factory. Missing dependencies and load/factory exceptions are isolated. IDs must be unique lowercase words with hyphens. Factories accept shared `AppContext` and return a Qt widget. `context.run_task(...)` provides cancellation/progress and main-thread callbacks; `context.resource_text(name)` reads bundled UTF-8 resources independent of working directory. Workers receive ordinary data snapshots, never widgets; analysis functions enforce their own target restrictions. Add resources under `toolkit/resources/`, tests under `tests/`, and rebuild the spec to include the new module.
-
-Git history is local and records verified implementation slices. Errors remain local; no Sentry telemetry is configured.
+If startup fails, launch `Start-Toolkit.cmd` from the source checkout to read the local error. A failed Python environment creation must be fixed before running its executable. Do not disable certificate verification to fix TLS problems. Close other Toolkit instances before repairing a profile. Native setup errors on Dashboard include the relevant missing prerequisite. See each feature guide for bounded-input and uncertain-command limitations.
 
 ## Metasploit setup (v2)
 

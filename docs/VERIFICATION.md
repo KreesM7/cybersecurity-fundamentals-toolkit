@@ -16,8 +16,10 @@ the lock. Optional PDF dependencies use `--extra pdf`.
 Native Metasploit integration tests require the documented dedicated Toolkit-MSF
 installation and `TOOLKIT_MSF_INTEGRATION=1`. They create only controlled loopback
 fixtures. General CI does not provision or run exploitation against external targets.
-Saved-capture subprocess checks require the independently installed worker; missing
-native components are reported as skips, while their unavailable-state tests still run.
+CI installs saved-capture dependencies into a separate `.worker` interpreter on each
+platform. Windows CI exercises stdio framing and owned-process termination; Unix
+control sockets run in Linux CI and dedicated Windows/WSL lab checks. Metasploit
+native-lab checks skip when prerequisites are absent; unavailable-state tests still run.
 
 Independent security review and installer smoke tests are separate mandatory release
 gates. Passing this workflow alone is not release signoff.

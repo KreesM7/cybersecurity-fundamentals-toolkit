@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import hashlib
 import json
 import secrets
 import time
@@ -14,7 +15,6 @@ from uuid import UUID, uuid4
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
-from jose import JWTError, jwt  # type: ignore[import-untyped]  # Pinned library has no type stubs.
 from pydantic import SecretStr
 from sqlalchemy import select
 
@@ -42,7 +42,7 @@ class VaultAccessError(ValueError):
 @dataclass
 class Unlocked:
     cipher: Fernet
-    jti: str
+    token_hash: bytes
     expires: float
     last_used: float
 
@@ -50,7 +50,6 @@ class Unlocked:
 class VaultService:
     def __init__(self, workspaces: WorkspaceService, events: EventHub) -> None:
         self.workspaces, self.events = workspaces, events
-        self._signing_key = secrets.token_bytes(32)
         self._sessions: dict[UUID, Unlocked] = {}
         self._candidates: dict[UUID, dict[UUID, CredentialInput]] = {}
         self._lock = asyncio.Lock()
@@ -111,24 +110,9 @@ class VaultService:
         if unlocked is None or now >= unlocked.expires or now - unlocked.last_used >= 300:
             self._discard(workspace_id)
             raise VaultAccessError("Vault is locked. Unlock it again.")
-        try:
-            claims = jwt.decode(
-                token,
-                self._signing_key,
-                algorithms=["HS256"],
-                options={
-                    "require_exp": True,
-                    "require_iat": True,
-                    "require_sub": True,
-                    "require_jti": True,
-                },
-            )
-            if claims.get("sub") != str(workspace_id) or not secrets.compare_digest(
-                str(claims.get("jti", "")), unlocked.jti
-            ):
-                raise VaultAccessError("Vault token belongs to another workspace or was revoked.")
-        except JWTError as exc:
-            raise VaultAccessError("Vault token is invalid or expired.") from exc
+        presented = hashlib.sha256(token.encode("utf-8")).digest()
+        if not secrets.compare_digest(presented, unlocked.token_hash):
+            raise VaultAccessError("Vault token is invalid or expired.")
         unlocked.last_used = now
         return unlocked.cipher
 
@@ -182,17 +166,9 @@ class VaultService:
                 raise VaultAccessError(
                     "Workspace changed while unlocking. Unlock the selected vault."
                 )
-            jti = uuid4().hex
-            self._sessions[workspace_id] = Unlocked(cipher, jti, now + 900, now)
-            token = jwt.encode(
-                {
-                    "sub": str(workspace_id),
-                    "jti": jti,
-                    "iat": int(time.time()),
-                    "exp": int(time.time()) + 900,
-                },
-                self._signing_key,
-                algorithm="HS256",
+            token = secrets.token_urlsafe(32)
+            self._sessions[workspace_id] = Unlocked(
+                cipher, hashlib.sha256(token.encode("utf-8")).digest(), now + 900, now
             )
             return VaultToken(token=token)
 
@@ -356,4 +332,3 @@ class VaultService:
             self._reaper.cancel()
             await asyncio.gather(self._reaper, return_exceptions=True)
         await self.lock_all()
-        self._signing_key = b""

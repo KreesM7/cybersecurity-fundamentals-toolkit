@@ -31,7 +31,7 @@ analysis = Analysis(
     datas=datas,
     hiddenimports=(collect_submodules('toolkit.modules') + collect_submodules('backend.tools')
                    + collect_submodules('frontend.views')
-                   + ['sqlalchemy.dialects.sqlite.aiosqlite', 'jose.backends.cryptography_backend',
+                   + ['sqlalchemy.dialects.sqlite.aiosqlite',
                       'keyring.backends.Windows' if sys.platform == 'win32' else 'keyring.backends.SecretService',
                       'aiosqlite', 'magic', 'nmap', 'zxcvbn', 'psutil', 'bs4', 'urllib3']),
     hookspath=[],

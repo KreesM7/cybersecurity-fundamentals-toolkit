@@ -2,7 +2,7 @@
 
 Each workspace has an independent vault. Initialize it with a master passphrase of at least 12 characters. The master passphrase is never saved. Fernet encrypts the complete credential record; PBKDF2-HMAC-SHA256 uses 600,000 iterations, a random 32-byte salt and a 32-byte derived key. KDF parameters and the encrypted verification marker are stored beside ciphertext.
 
-Unlocking creates a workspace-bound JWT signed with a fresh in-memory server key. Its maximum lifetime is 15 minutes; five minutes without a protected vault operation locks the vault sooner. Status polling does not count as activity. Lock, workspace switch, password change and application shutdown revoke access and discard keys and temporary candidates. Python does not guarantee physical zeroization of all previously allocated immutable memory.
+Unlocking creates a random 256-bit opaque session token. Only its SHA-256 digest is held in the workspace-bound server session and comparisons are constant-time. Its maximum lifetime is 15 minutes; five minutes without a protected vault operation locks the vault sooner. Status polling does not count as activity. Lock, workspace switch, password change and application shutdown revoke access and discard keys and temporary candidates. Python does not guarantee physical zeroization of all previously allocated immutable memory.
 
 **Add temporary candidate** holds the credential in memory. Only **Accept candidate** writes ciphertext to the workspace database. Reveal requires the master passphrase again and clears the displayed secret after 30 seconds or when locked. Password changes re-encrypt all saved records and the check marker in a single database transaction; failures roll back and preserve the old password.
 

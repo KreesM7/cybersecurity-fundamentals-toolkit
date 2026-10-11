@@ -37,12 +37,13 @@ printf '%s\n' 'deb [signed-by=/usr/share/keyrings/metasploit-framework.gpg] http
 apt-get update
 apt-get install -y metasploit-framework
 python3 -m venv /opt/toolkit-scapy
-/opt/toolkit-scapy/bin/python -m pip install "$project_dir/worker"
+python3 "$script_dir/build_worker_wheel.py"
+(cd "$project_dir/worker" && /opt/toolkit-scapy/bin/python -m pip install --require-hashes -r requirements-provision.txt)
 install -d -m 755 /opt/toolkit-msf
 install -m 755 "$script_dir/start-msfrpc.py" /opt/toolkit-msf/start-msfrpc.py
 install -m 644 "$script_dir/toolkit_rpc.rb" /opt/toolkit-msf/toolkit_rpc.rb
 python3 -m venv /opt/toolkit-msf/venv
-/opt/toolkit-msf/venv/bin/python -m pip install 'pexpect==4.9.0' 'ptyprocess==0.7.0'
+/opt/toolkit-msf/venv/bin/python -m pip install --require-hashes -r "$script_dir/requirements/pty.txt"
 install -m 755 "$script_dir/pty-host.py" /opt/toolkit-msf/pty-host.py
 install -m 755 "$script_dir/payload-host.py" /opt/toolkit-msf/payload-host.py
 install -m 644 "$script_dir/toolkit_bridge.rb" /opt/toolkit-msf/toolkit_bridge.rb

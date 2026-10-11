@@ -23,5 +23,9 @@ erasure of Python/Qt memory are not guaranteed.
 
 Release security review and its scope are recorded in docs/SECURITY_REVIEW.md.
 Installers are unsigned. Verify SHA256SUMS against the GitHub release assets and
-review the corresponding source; checksums establish file identity, not publisher
-code-signing identity. Never disable TLS validation as a workaround.
+review the corresponding source. Releases processed by the Release integrity
+workflow also include keyless Sigstore bundles for artifacts and SHA256SUMS;
+verify the exact workflow identity and OIDC issuer as documented in
+docs/RELEASE_VERIFICATION.md. These detached signatures do not replace native
+Authenticode/notarization or remove operating-system warnings. Never disable
+TLS validation as a workaround.

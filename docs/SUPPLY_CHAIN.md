@@ -39,6 +39,9 @@ that hash whenever worker source changes. PyPI requirements include upstream
 SHA-256 hashes, and pip verifies every downloaded/transitive distribution.
 CI tests both installations in fresh virtual environments. Scapy remains outside
 the main desktop distribution and lock.
+Dependabot tracks the worker's `pyproject.toml`; its local-wheel provisioning
+manifest is excluded from update discovery because the wheel is generated in CI.
+Worker dependency updates must also refresh the reviewed provisioning hashes.
 
 ## Historical fixture removal
 

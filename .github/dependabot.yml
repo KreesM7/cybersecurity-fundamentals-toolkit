@@ -2,6 +2,8 @@ version: 2
 updates:
   - package-ecosystem: pip
     directories: ["/", "/worker", "/scripts/requirements"]
+    # The local worker wheel is built in CI, not committed to Git.
+    exclude-paths: ["requirements-provision.txt", "**/requirements-provision.txt"]
     schedule:
       interval: weekly
     groups:

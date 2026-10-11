@@ -63,3 +63,77 @@ jobs:
           path: |
             coverage.xml
             vault-benchmark.json
+
+  dependency-audit:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Install locked audit environment
+        run: |
+          python -m pip install uv==0.12.24
+          python -m uv sync --locked --extra dev --extra build --group security
+      - name: Strict vulnerability audit
+        run: python -m uv run --no-sync python scripts/audit_dependencies.py
+      - name: Supply-chain policy tests
+        run: python -m uv run --no-sync pytest tests/test_supply_chain.py -q
+      - name: Verify hashed provisioning installs
+        run: |
+          python scripts/build_worker_wheel.py
+          python -m venv work/provision-worker
+          (cd worker && ../work/provision-worker/bin/python -m pip install --require-hashes -r requirements-provision.txt)
+          python -m venv work/provision-pty
+          work/provision-pty/bin/python -m pip install --require-hashes -r scripts/requirements/pty.txt
+          work/provision-worker/bin/python -m toolkit_scapy_worker --help
+      - name: Archive findings and explicit no-fix exceptions
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: dependency-audit
+          path: work/dependency-audit/
+
+  secret-scan:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1 # v6
+        with:
+          python-version: '3.12'
+      - name: Scan every reachable commit and ref
+        run: python scripts/install_gitleaks.py --scan-history
+
+  codeql:
+    if: github.ref == 'refs/heads/main' || github.base_ref == 'main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      security-events: write
+      actions: read
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - uses: github/codeql-action/init@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          languages: python
+          build-mode: none
+      - uses: github/codeql-action/analyze@24c54180a607b1449ed407dd24f251e4e9147c8d # v4.38.3
+        with:
+          category: /language:python
+
+  container-test:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6
+      - name: Build digest-pinned test image
+        run: docker build --tag toolkit-tests .
+      - name: Verify non-root test environment
+        run: |
+          test "$(docker run --rm --entrypoint id toolkit-tests -u)" = 10001
+          docker run --rm toolkit-tests

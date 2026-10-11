@@ -80,3 +80,10 @@ source = ["backend", "frontend", "shared", "toolkit"]
 [tool.coverage.report]
 fail_under = 75
 show_missing = true
+
+[dependency-groups]
+security = [
+    "cyclonedx-bom==7.5.0",
+    "pip-audit==2.10.1",
+    "pre-commit==4.6.2",
+]

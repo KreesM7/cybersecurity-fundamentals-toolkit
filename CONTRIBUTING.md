@@ -7,8 +7,28 @@ run strict mypy on the four application packages; run `pytest --cov` with the
 
 Use controlled fixtures and loopback targets. Do not include real credentials,
 captures, payload artifacts, private profiles or native installers in commits.
-The intentionally untrusted public TLS key in tests/fixtures is a rejection-test
-fixture; it is never application trust material.
+TLS rejection tests generate disposable certificate/key pairs through pytest's
+`local_tls_pair` fixture; never commit even test-only private keys.
+
+Install local gates after cloning:
+
+```sh
+uv sync --locked --extra dev --extra build --group security
+uv run pre-commit install
+uv run pre-commit run --all-files
+uv run pre-commit run --hook-stage pre-push --all-files
+```
+
+The config installs pre-commit and pre-push hooks. Black/Ruff versions match CI;
+Gitleaks checks staged changes before commit and full history before push. Its
+downloaded binary is verified against a committed SHA-256 pin on every run.
+The first run needs access to the pinned upstream tools. No scanner allowlist is
+used. Update the pinned hook versions together with pyproject.toml and uv.lock.
+
+Weekly Dependabot pip/Actions updates group minor/patch versions; majors remain
+individual PRs. Regenerate `uv.lock` for pip updates (pip does not maintain uv's
+lock), and regenerate provisioning hashes after reviewing a dependency update.
+See docs/SUPPLY_CHAIN.md for audit exceptions and history cleanup.
 
 Keep frontend/backend boundaries and independently installed worker interfaces
 intact. Document new native prerequisites. Use stable mutation IDs and never

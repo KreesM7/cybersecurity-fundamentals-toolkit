@@ -5,6 +5,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Header, Request
 
+from backend.mutations import MutationConflictError
 from backend.services.vault_service import VaultService
 from shared.activity import ActionResult
 from shared.vault import (
@@ -38,15 +39,23 @@ async def status(request: Request, workspace_id: UUID) -> VaultStatus:
 async def unlock(
     request: Request, workspace_id: UUID, data: VaultUnlock, request_id: RequestID
 ) -> VaultToken:
-    async def action() -> VaultToken:
-        return await service(request).unlock(
+    issued: VaultToken | None = None
+
+    async def action() -> ActionResult:
+        nonlocal issued
+        issued = await service(request).unlock(
             workspace_id, data.password, initialize=data.initialize
         )
+        return ActionResult(status="unlocked")
 
-    result = await request.app.state.mutations.execute(
+    await request.app.state.mutations.execute(
         workspace_id, request_id, "vault.unlock", data.transport_dump(), action, secret=True
     )
-    return VaultToken.model_validate(result)
+    if issued is None:
+        raise MutationConflictError(
+            "Unlock response already delivered. Unlock again using a new request ID."
+        )
+    return issued
 
 
 @router.post("/lock", response_model=ActionResult)

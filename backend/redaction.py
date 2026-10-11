@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import re
 import traceback
@@ -17,9 +18,15 @@ _NAME = (
     r"[A-Za-z0-9_]*"
 )
 _KEY = re.compile(r"(?<![A-Za-z0-9])" + _NAME + r"(?![A-Za-z0-9_])", re.IGNORECASE)
-_ASSIGNMENT = re.compile(r"(?im)((?<![A-Za-z0-9])" + _NAME + r"[ \t]*[:=][ \t]*)([^\r\n]*)")
-_SET = re.compile(r"(?im)((?<![A-Za-z0-9])setg?[ \t]+" + _NAME + r"[ \t]+)([^\r\n]*)")
-_JSON = re.compile(r'(?i)("' + _NAME + r'"\s*:\s*)"(?:\\.|[^"\\])*"')
+# Consume identifiers once, then classify them. Searching the prefixed secret-name
+# expression at every underscore creates quadratic work on untrusted log output.
+_IDENTIFIER = re.compile(r"[A-Za-z0-9_]+(?:-key)?", re.IGNORECASE)
+_ASSIGNMENT = re.compile(r"(?im)(?<![A-Za-z0-9])(?<![_-])(?P<key>[A-Za-z0-9_-]+)[ \t]*[:=][ \t]*")
+_SET = re.compile(r"(?im)(?<![A-Za-z0-9])(?<![_-])setg?[ \t]+(?P<key>[A-Za-z0-9_-]+)[ \t]+")
+_JSON_STRING = re.compile(r'"(?:\\.|[^"\\])*"')
+_SPACE = re.compile(r"\s*")
+_JSON_DECODER = json.JSONDecoder()
+_LINE_END = re.compile(r"[\r\n]")
 _USERINFO = re.compile(r"://[^/@\s]+:[^/@\s]+@")
 _HEADERS = re.compile(
     r"(?im)((?<![A-Za-z0-9_-])(?:Cookie|Set-Cookie|X-Vault-Token|X-Api-Key)"
@@ -31,6 +38,62 @@ _PRIVATE_KEY = re.compile(
     r"-----BEGIN [A-Z ]*PRIVATE KEY-----[\s\S]*?(?:-----END [A-Z ]*PRIVATE KEY-----|$)"
 )
 _NTLM_PAIR = re.compile(r"\b[0-9a-fA-F]{32}:[0-9a-fA-F]{32}\b")
+
+
+def _sensitive_key(value: str) -> bool:
+    return any(_KEY.fullmatch(match.group()) for match in _IDENTIFIER.finditer(value))
+
+
+def _redact_json(value: str) -> str:
+    pieces: list[str] = []
+    cursor = scan = 0
+    while (start := value.find('"', scan)) >= 0:
+        # Anchor at the next quote and consume the entire token, even when it is
+        # not a key. Restarting at every escaped quote makes malformed text quadratic.
+        match = _JSON_STRING.match(value, start)
+        if match is None:
+            break
+        scan = match.end()
+        space = _SPACE.match(value, scan)
+        assert space is not None
+        colon = space.end()
+        if colon >= len(value) or value[colon] != ":":
+            continue
+        try:
+            key = json.loads(match.group())
+        except ValueError:
+            continue
+        if not _sensitive_key(key):
+            continue
+        space = _SPACE.match(value, colon + 1)
+        assert space is not None
+        end = space.end()
+        pieces.append(value[cursor:end])
+        try:
+            _, cursor = _JSON_DECODER.raw_decode(value, end)
+        except (ValueError, RecursionError):
+            # A malformed/truncated secret value cannot safely be displayed.
+            cursor = len(value)
+        pieces.append('"' + REDACTED + '"')
+        scan = cursor
+    pieces.append(value[cursor:])
+    return "".join(pieces)
+
+
+def _redact_fields(value: str, pattern: re.Pattern[str]) -> str:
+    pieces: list[str] = []
+    cursor = 0
+    for match in pattern.finditer(value):
+        if match.start() < cursor:
+            continue
+        if not _sensitive_key(match.group("key")):
+            continue
+        pieces.append(value[cursor : match.end()])
+        end = _LINE_END.search(value, match.end())
+        cursor = end.start() if end else len(value)
+        pieces.append(REDACTED)
+    pieces.append(value[cursor:])
+    return "".join(pieces)
 
 
 class Redactor:
@@ -60,15 +123,17 @@ class Redactor:
         bounded = _NTLM_PAIR.sub(REDACTED, bounded)
         bounded = _JWT.sub(REDACTED, bounded)
         bounded = _USERINFO.sub("://" + REDACTED + "@", bounded)
-        bounded = _JSON.sub(lambda match: match.group(1) + '"' + REDACTED + '"', bounded)
-        for pattern in (_HEADERS, _SET, _ASSIGNMENT, _BEARER):
+        bounded = _redact_json(bounded)
+        for pattern in (_SET, _ASSIGNMENT):
+            bounded = _redact_fields(bounded, pattern)
+        for pattern in (_HEADERS, _BEARER):
             bounded = pattern.sub(lambda match: match.group(1) + REDACTED, bounded)
         return bounded[:10000]
 
     def clean(self, value: JsonValue) -> JsonValue:
         if isinstance(value, dict):
             return {
-                key: REDACTED if _KEY.search(key) else self.clean(item)
+                key: REDACTED if _sensitive_key(key) else self.clean(item)
                 for key, item in value.items()
             }
         if isinstance(value, list):

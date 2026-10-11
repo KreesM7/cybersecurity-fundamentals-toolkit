@@ -1,5 +1,6 @@
 import io
 import logging
+import time
 import traceback
 
 import pytest
@@ -23,6 +24,13 @@ SECRETS = [
     ("set DB_PASSWORD hidden-value", "hidden-value"),
     ("setg ADMIN_PASS hidden-value", "hidden-value"),
     ('{"client_secret": "hidden\\"value", "ok": true}', "hidden"),
+    ('{"password":123456}', "123456"),
+    ('{"api_key":["hidden-value"]}', "hidden-value"),
+    ('{"x-api-key":"hidden-value"}', "hidden-value"),
+    ('{"db_password":{"nested":["hidden-value"]},"ok":true}', "hidden-value"),
+    ('{"password":"unterminated-hidden-value', "hidden-value"),
+    ('{"pass\\u0077ord":"hidden-value"}', "hidden-value"),
+    ("error: client_secret=hidden-value", "hidden-value"),
 ]
 
 
@@ -57,6 +65,24 @@ def test_prefixed_dictionary_keys():
         "PGPASSWORD": REDACTED,
         "admin_pass": REDACTED,
     }
+
+
+@pytest.mark.parametrize(
+    "text",
+    ["_" * 65536, "password" * 8192, "password=x\n" * 6000, (chr(92) + chr(34)) * 32768],
+    ids=["underscores", "no-delimiter", "many-fields", "escaped-quotes"],
+)
+def test_long_identifiers_and_many_fields_have_bounded_runtime(text):
+    start = time.perf_counter()
+    result = Redactor().text(text)
+    assert time.perf_counter() - start < 1.0
+    assert len(result) <= 10000
+
+
+def test_json_container_redaction_preserves_unrelated_fields():
+    assert Redactor().text('{"secret":{"nested":[1,2]},"ok":true}') == (
+        '{"secret":"[REDACTED]","ok":true}'
+    )
 
 
 @pytest.mark.asyncio

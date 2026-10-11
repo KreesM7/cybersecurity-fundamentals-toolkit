@@ -8,7 +8,7 @@ Unlocking creates a random 256-bit opaque session token. Only its SHA-256 digest
 
 **Export plaintext** is a separate, confirmed action requiring reauthentication and a user-selected filename. It does not create a plaintext artifact inside the profile. Protect that intentionally unencrypted export yourself. Reports never include vault contents. RPC passwords use the OS keyring only when explicitly requested in Settings.
 
-Vault APIs require the normal instance Bearer token. Protected operations additionally require `X-Vault-Token`; neither token belongs in a URL. Shared contracts are in `shared/vault.py`. Reveal and export are read operations with uncached plaintext responses. Candidate and unlock replay records are memory-only. Accepted credential mutations persist only identifiers and status, never plaintext values. Locked or revoked access returns HTTP 423.
+Vault APIs require the normal instance Bearer token. Protected operations additionally require `X-Vault-Token`; neither token belongs in a URL. Shared contracts are in `shared/vault.py`. Reveal and export are read operations with uncached plaintext responses. Candidate replay records are memory-only. Unlock replay records retain only completion status, never the issued token. A duplicate completed unlock request returns HTTP 409 and asks for a new request ID; it never silently repeats the unlock. Accepted credential mutations persist only identifiers and status, never plaintext values. Locked or revoked access returns HTTP 423.
 
 Failed unlock attempts impose an in-memory, per-workspace retry cooldown of 1, 2, 4, 8, 16, 32, then 60 seconds. Success resets it. Cancelling a waiting request does not clear its cooldown. Password derivation runs outside the shared vault lock; a workspace-specific gate serializes password operations. Lock or workspace switch invalidates pending unlocks before they can grant access. Error responses do not disclose attempt counts or distinguish unknown workspaces from wrong passwords.
 
@@ -19,6 +19,17 @@ The fixed Argon2id parameters follow the [OWASP minimum configuration](https://c
 Existing PBKDF2-HMAC-SHA256 vaults with 600,000 iterations remain readable. Successful unlock first creates an owner-only SQLite backup named workspace.pre-argon2-<random>.db (including committed WAL contents), then re-encrypts every credential and the check marker with a fresh Argon2id salt in one transaction. Backup, encryption or commit failure leaves the old vault intact. Wrong passwords never migrate. The encrypted backup retains its old password; keep it protected and remove it only after independently verifying the migrated vault. No user vault was used in migration tests: tests build legacy fixtures and open separate copies, preserving the originals.
 
 Run python scripts/benchmark_vault.py to measure one warmup followed by 20 derivations. CI records median, p95 and maximum on Windows/Ubuntu and Python 3.11/3.12; p95 must remain below 300 ms. Local Windows 11 / Python 3.12.14 measured median 17.516 ms, p95 18.344 ms and maximum 21.918 ms. These are measurements, not a latency guarantee for every computer.
+
+Measured on GitHub-hosted CI hardware in [run 38079453337](https://github.com/KreesM7/cybersecurity-fundamentals-toolkit/actions/runs/38079453337), 2026-10-10, commit `776148a`, using the chosen 19 MiB / t=2 / p=1 configuration:
+
+| Runner | Python | Median (ms) | p95 (ms) | Maximum (ms) |
+| --- | --- | ---: | ---: | ---: |
+| Windows latest, AMD64 Family 25 Model 1 | 3.11.9 | 27.368 | 30.570 | 37.090 |
+| Windows Server 2025, AMD64 Family 25 Model 1 | 3.12.10 | 27.750 | 28.493 | 32.049 |
+| Ubuntu 24.04, Linux 6.17 Azure x86_64 | 3.11.17 | 14.782 | 15.692 | 15.711 |
+| Ubuntu 24.04, Linux 6.17 Azure x86_64 | 3.12.15 | 19.407 | 20.326 | 20.720 |
+
+All four jobs passed the benchmark and their complete regression suites. CI archives the machine-readable `vault-benchmark.json` alongside coverage results.
 
 ## Key lifetime and audit trail
 

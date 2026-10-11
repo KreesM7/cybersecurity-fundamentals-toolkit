@@ -1,5 +1,13 @@
 # Changelog
 
+## Unreleased
+
+- Redact prefixed secret fields, JSON values, credential URLs, sensitive headers, JWTs and exception logs; bound work on long log identifiers.
+- Replace vault JWT sessions with hashed opaque tokens and exclude issued tokens from mutation replay storage.
+- Add workspace-scoped unlock backoff and move password derivation outside the shared vault lock.
+- Use Argon2id for new vaults and atomically migrate legacy PBKDF2 vaults after making a protected backup; benchmark costs in CI.
+- Wipe mutable session key buffers on discard, record redacted vault audit events, and apply common WebSocket size/rate limits.
+
 ## 2.0.0
 
 - PyQt6 desktop with private authenticated HTTPS/WSS backend and isolated local profiles.

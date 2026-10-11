@@ -25,7 +25,7 @@ from backend.mutations import (
     UnknownOutcomeError,
 )
 from backend.redaction import Redactor, install_logging_redaction
-from backend.request_limits import RequestBodyLimit
+from backend.request_limits import RequestBodyLimit, WebSocketLimits
 from backend.routers import (
     activity,
     connection,
@@ -157,6 +157,7 @@ def create_app(
     app.state.instance_id = instance_id
     app.state.instance_token = instance_token
     app.add_middleware(RequestBodyLimit)
+    app.add_middleware(WebSocketLimits)
     origins = allowed_origins or set()
     install_auth(app, instance_token, allowed_origins=origins)
     app.include_router(workspaces.router, prefix="/api/v1")

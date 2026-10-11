@@ -83,6 +83,12 @@ class EventHub:
     async def publish(
         self, topic: str, data: JsonValue, *, workspace_id: UUID | None = None
     ) -> None:
+        self.publish_nowait(topic, data, workspace_id=workspace_id)
+
+    def publish_nowait(
+        self, topic: str, data: JsonValue, *, workspace_id: UUID | None = None
+    ) -> None:
+        """Publish atomically on the owning event loop, including synchronous access checks."""
         safe_data = self.redactor.clean(data)
         if len(json.dumps(safe_data, allow_nan=False).encode("utf-8")) > 60000:
             safe_data = {

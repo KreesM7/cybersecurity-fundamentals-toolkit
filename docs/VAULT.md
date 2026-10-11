@@ -19,3 +19,9 @@ The fixed Argon2id parameters follow the [OWASP minimum configuration](https://c
 Existing PBKDF2-HMAC-SHA256 vaults with 600,000 iterations remain readable. Successful unlock first creates an owner-only SQLite backup named workspace.pre-argon2-<random>.db (including committed WAL contents), then re-encrypts every credential and the check marker with a fresh Argon2id salt in one transaction. Backup, encryption or commit failure leaves the old vault intact. Wrong passwords never migrate. The encrypted backup retains its old password; keep it protected and remove it only after independently verifying the migrated vault. No user vault was used in migration tests: tests build legacy fixtures and open separate copies, preserving the originals.
 
 Run python scripts/benchmark_vault.py to measure one warmup followed by 20 derivations. CI records median, p95 and maximum on Windows/Ubuntu and Python 3.11/3.12; p95 must remain below 300 ms. Local Windows 11 / Python 3.12.14 measured median 17.516 ms, p95 18.344 ms and maximum 21.918 ms. These are measurements, not a latency guarantee for every computer.
+
+## Key lifetime and audit trail
+
+Unlocked sessions retain a mutable 32-byte key buffer, not a long-lived Fernet object. Discard, replacement, password change, expiry, lock and shutdown overwrite that buffer before dropping the session. Operation-local immutable Python and native-library copies may survive until reclaimed; best-effort wiping does not guarantee physical erasure, as described in SECURITY.md.
+
+Unlock success/failure and session expiry emit redacted vault-audit entries into the existing bounded local activity feed and the standard local logger. Entries contain action, outcome and workspace identity only, never passwords, tokens, key material or attempt counts. The activity feed is memory-only and bounded; durable audit retention requires a locally configured logging handler.

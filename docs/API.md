@@ -55,3 +55,5 @@ queues are bounded; reconnect/resynchronization reloads current state without
 replaying commands. Analysis permits two running jobs and 32 waiting jobs. API
 responses do not grant authority to test targets; ownership confirmation and target
 validation are still enforced inside analysis services.
+
+All WebSocket routes share an application-wide boundary: at most 65,536 UTF-8/binary bytes per message and 100 messages in a sliding second, independently for receive and send. Size violations close with 1009; rate violations close with 1013 and require REST resynchronization. Activity, desktop and connection events all travel through /ws/events and therefore share these limits; /ws/jobs and future WebSocket routers use the same middleware. The current streams reject inbound commands. Existing transport queue and subscriber bounds remain in effect.

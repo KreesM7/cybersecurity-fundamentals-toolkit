@@ -6,12 +6,13 @@ import asyncio
 import base64
 import hashlib
 import json
+import logging
 import secrets
 import sqlite3
 import time
 from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager, closing
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from datetime import UTC, datetime
 from pathlib import Path
 from typing import TypeVar
@@ -67,10 +68,15 @@ class VaultAccessError(ValueError):
 
 @dataclass
 class Unlocked:
-    cipher: Fernet
-    token_hash: bytes
+    key_material: bytearray = field(repr=False)
+    token_hash: bytes = field(repr=False)
     expires: float
     last_used: float
+
+    @property
+    def cipher(self) -> Fernet:
+        # Keep only the wipeable buffer in session state; operation-local copies are temporary.
+        return Fernet(base64.urlsafe_b64encode(self.key_material))
 
 
 class VaultService:
@@ -99,7 +105,7 @@ class VaultService:
                     if now >= value.expires or now - value.last_used >= 300
                 ]
                 for scope in expired:
-                    self._discard(scope)
+                    self._discard(scope, expired=True)
                     await self.events.publish(
                         "vault-locked", {"reason": "expired"}, workspace_id=scope
                     )
@@ -195,8 +201,21 @@ class VaultService:
             config.encrypted_check = replacement.encrypt(CHECK)
         return replacement
 
-    def _discard(self, workspace_id: UUID) -> None:
-        self._sessions.pop(workspace_id, None)
+    def _audit(self, workspace_id: UUID, action: str, outcome: str) -> None:
+        self.events.publish_nowait(
+            "vault-audit", {"action": action, "outcome": outcome}, workspace_id=workspace_id
+        )
+        logging.getLogger("toolkit.vault").info(
+            "Vault %s %s workspace=%s", action, outcome, workspace_id
+        )
+
+    def _discard(self, workspace_id: UUID, *, expired: bool = False) -> None:
+        value = self._sessions.pop(workspace_id, None)
+        if value is not None:
+            value.key_material[:] = b"\x00" * len(value.key_material)
+            value.token_hash = b""
+            if expired:
+                self._audit(workspace_id, "session-expired", "locked")
         self._candidates.pop(workspace_id, None)
 
     def _access(self, workspace_id: UUID, token: str) -> Fernet:
@@ -206,7 +225,7 @@ class VaultService:
         unlocked = self._sessions.get(workspace_id)
         now = time.monotonic()
         if unlocked is None or now >= unlocked.expires or now - unlocked.last_used >= 300:
-            self._discard(workspace_id)
+            self._discard(workspace_id, expired=unlocked is not None)
             raise VaultAccessError("Vault is locked. Unlock it again.")
         presented = hashlib.sha256(token.encode("utf-8")).digest()
         if not secrets.compare_digest(presented, unlocked.token_hash):
@@ -222,7 +241,7 @@ class VaultService:
             if value and (
                 time.monotonic() >= value.expires or time.monotonic() - value.last_used >= 300
             ):
-                self._discard(workspace_id)
+                self._discard(workspace_id, expired=True)
             return VaultStatus(
                 workspace_id=workspace_id,
                 initialized=config is not None,
@@ -270,6 +289,17 @@ class VaultService:
     async def unlock(
         self, workspace_id: UUID, password: SecretStr, *, initialize: bool = False
     ) -> VaultToken:
+        try:
+            result = await self._unlock(workspace_id, password, initialize=initialize)
+        except Exception:
+            self._audit(workspace_id, "unlock", "failure")
+            raise
+        self._audit(workspace_id, "unlock", "success")
+        return result
+
+    async def _unlock(
+        self, workspace_id: UUID, password: SecretStr, *, initialize: bool = False
+    ) -> VaultToken:
         async with self._password_operation(workspace_id) as (lease, generation):
             _, retry_at = self._failures.get(workspace_id, (0, 0.0))
             await asyncio.sleep(max(0, retry_at - time.monotonic()))
@@ -311,8 +341,12 @@ class VaultService:
                 self._failures.pop(workspace_id, None)
                 now = time.monotonic()
                 token = secrets.token_urlsafe(32)
+                self._discard(workspace_id)
                 self._sessions[workspace_id] = Unlocked(
-                    cipher, hashlib.sha256(token.encode("utf-8")).digest(), now + 900, now
+                    bytearray(cipher._signing_key + cipher._encryption_key),
+                    hashlib.sha256(token.encode("utf-8")).digest(),
+                    now + 900,
+                    now,
                 )
                 return VaultToken(token=token)
 
@@ -467,7 +501,8 @@ class VaultService:
     async def lock_all(self) -> None:
         async with self._lock:
             self._generation += 1
-            self._sessions.clear()
+            for workspace_id in tuple(self._sessions):
+                self._discard(workspace_id)
             self._candidates.clear()
             await self.events.publish("vault-locked", {"reason": "locked"})
 

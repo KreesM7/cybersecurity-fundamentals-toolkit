@@ -1,3 +1,3 @@
 # Local TLS test material
 
-`local-cert.txt` and `local-key.txt` are a generated, self-signed certificate and its openly published key for a temporary loopback fixture. They are deliberately untrusted and verify that HTTPS validation rejects them before an HTTP request reaches the fixture. They are not application credentials and must never be used for a deployed server.
+The `local_tls_pair` pytest fixture in `tests/conftest.py` creates a fresh self-signed certificate and private key inside `tmp_path` for each test. The loopback HTTPS rejection test verifies that certificate validation fails before an HTTP request reaches the server. No private-key material is committed.

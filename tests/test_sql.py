@@ -4,10 +4,11 @@ import ssl
 import time
 import unittest
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
-from pathlib import Path
 from threading import Event, Thread, Timer
 from unittest.mock import patch
 from urllib.parse import parse_qs, urlsplit
+
+import pytest
 
 
 class LabHandler(BaseHTTPRequestHandler):
@@ -274,26 +275,26 @@ class SQLTests(unittest.TestCase):
             client.request(self.base + "/search")
         self.assertEqual(len(LabHandler.requests), before)
 
-    def test_untrusted_https_certificate_is_rejected(self):
-        module = self.module()
-        fixtures = Path(__file__).parent / "fixtures"
-        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
-        context.load_cert_chain(fixtures / "local-cert.txt", fixtures / "local-key.txt")
-        server = ThreadingHTTPServer(("127.0.0.1", 0), LabHandler)
-        server.socket = context.wrap_socket(server.socket, server_side=True)
-        thread = Thread(target=server.serve_forever, daemon=True)
-        thread.start()
-        before = len(LabHandler.requests)
-        try:
-            import urllib3
 
-            with self.assertRaises(urllib3.exceptions.SSLError):
-                module.LimitedClient().request(f"https://127.0.0.1:{server.server_port}/form")
-            self.assertEqual(len(LabHandler.requests), before)
-        finally:
-            server.shutdown()
-            server.server_close()
-            thread.join()
+def test_untrusted_https_certificate_is_rejected(local_tls_pair):
+    import urllib3
+
+    module = importlib.import_module("toolkit.modules.sql_checker")
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(*local_tls_pair)
+    server = ThreadingHTTPServer(("127.0.0.1", 0), LabHandler)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    thread = Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    before = len(LabHandler.requests)
+    try:
+        with pytest.raises(urllib3.exceptions.SSLError):
+            module.LimitedClient().request(f"https://127.0.0.1:{server.server_port}/form")
+        assert len(LabHandler.requests) == before
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join()
 
 
 if __name__ == "__main__":

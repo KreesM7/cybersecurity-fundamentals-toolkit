@@ -95,14 +95,26 @@ async def test_overflow_disconnects_even_while_transport_send_is_stalled(
 def test_websocket_uses_bearer_rejects_query_auth_and_streams_redacted_events(
     tmp_path: Path,
 ) -> None:
+    from threading import Event
+
     from fastapi.testclient import TestClient
     from starlette.websockets import WebSocketDisconnect
 
     app = create_app(TOKEN, "ws", tmp_path)
-    with TestClient(app) as client:
+    finished = Event()
+
+    async def observed_app(scope, receive, send):
+        try:
+            await app(scope, receive, send)
+        finally:
+            if scope["type"] == "websocket":
+                finished.set()
+
+    with TestClient(observed_app) as client:
         with pytest.raises(WebSocketDisconnect):
             with client.websocket_connect(f"/ws/events?token={TOKEN}"):
                 raise AssertionError("Query authentication was accepted")
+        finished.clear()
         with client.websocket_connect("/ws/events", headers=AUTH) as socket:
             response = client.post(
                 "/api/v1/workspaces/",
@@ -114,6 +126,11 @@ def test_websocket_uses_bearer_rejects_query_auth_and_streams_redacted_events(
             assert event["topic"] == "workspace-created"
             assert event["data"]["name"] == "WS Lab"
             assert TOKEN not in str(event)
+            # TestClient cancels its AnyIO scope immediately on context exit.
+            # Await the real ASGI cleanup first instead of racing that cancellation.
+            socket.close()
+            assert finished.wait(2), "WebSocket cleanup did not complete"
+            assert not app.state.events._subscriptions
 
 
 async def test_lifecycle_persistence_mutations_and_private_docs(tmp_path: Path) -> None:

@@ -6,7 +6,6 @@ from PyQt6.QtWidgets import (
     QFileDialog,
     QFormLayout,
     QHBoxLayout,
-    QInputDialog,
     QLabel,
     QLineEdit,
     QMessageBox,
@@ -18,6 +17,7 @@ from PyQt6.QtWidgets import (
 )
 
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.presentation import StatusBadge, enhance, input_dialog
 from shared.activity import ActionResult
 from shared.vault import (
     CredentialInput,
@@ -41,7 +41,10 @@ class VaultPanel(QWidget):
         self._export_path = ""
         self._unlocked = False
         root = QVBoxLayout(self)
-        self.status = QLabel("Vault locked. Keys remain in memory only while unlocked.")
+        heading = QLabel("Credential vault")
+        heading.setObjectName("pageTitle")
+        root.addWidget(heading)
+        self.status = StatusBadge("Vault locked. Keys remain in memory only while unlocked.")
         self.status.setTextFormat(Qt.TextFormat.PlainText)
         root.addWidget(self.status)
         row = QHBoxLayout()
@@ -94,11 +97,10 @@ class VaultPanel(QWidget):
         self.status_timer.start()
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.error)
+        enhance(self)
 
     def password(self, title: str = "Vault password") -> SecretStr | None:
-        text, accepted = QInputDialog.getText(
-            self, title, "Master passphrase", QLineEdit.EchoMode.Password
-        )
+        text, accepted = input_dialog(self, title, "Master passphrase", "passphrase", secret=True)
         return SecretStr(text) if accepted and text else None
 
     def unlock(self, initialize: bool) -> None:

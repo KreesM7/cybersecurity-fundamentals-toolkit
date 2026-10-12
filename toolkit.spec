@@ -16,7 +16,7 @@ if sys.platform == 'win32':
         str(windows / 'System32'), str(windows),
     ])
 datas = (collect_data_files('toolkit.resources')
-         + collect_data_files('frontend', includes=['resources/themes/*.qss'])
+         + collect_data_files('frontend', includes=['resources/themes/*.qss', 'resources/icons/*', 'resources/examples/*'])
          + collect_data_files('backend.repositories.migrations', include_py_files=True)
          + collect_data_files('zxcvbn') + [
     (str(root / 'examples'), 'examples'),
@@ -57,6 +57,7 @@ exe = EXE(
     pyz, analysis.scripts, [],
     exclude_binaries=True,
     name='CybersecurityFundamentalsToolkit',
+    icon=str(root / 'frontend/resources/icons/toolkit.ico') if sys.platform == 'win32' else None,
     debug=False,
     bootloader_ignore_signals=False,
     strip=False,

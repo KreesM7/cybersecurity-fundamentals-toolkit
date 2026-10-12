@@ -13,9 +13,10 @@ from PyQt6.QtWidgets import QApplication, QLabel
 from backend.bootstrap import InstanceLocator
 from backend.platform_utils import get_config_dir
 from backend.tls import TLSMaterial
+from frontend.icons import app_icon
 from frontend.main_window import MainWindow
 from frontend.runtime import BackendThread, finish_backend
-from frontend.theme import apply_theme
+from frontend.theme import SIZE, apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.tools.base import ToolPanel
 
@@ -33,9 +34,10 @@ def main(argv: list[str] | None = None) -> int:
     application = QApplication(sys.argv[:1])
     application.setApplicationName("Cybersecurity Fundamentals Toolkit")
     apply_theme(application, "dark")
+    application.setWindowIcon(app_icon())
     launcher = QLabel("Starting the authenticated local backend…")
     launcher.setWindowTitle("Cybersecurity Fundamentals Toolkit")
-    launcher.resize(600, 120)
+    launcher.resize(SIZE["launcher_w"], SIZE["launcher_h"])
     launcher.show()
     backend = BackendThread(profile)
     windows: list[MainWindow] = []

@@ -19,6 +19,7 @@ from PyQt6.QtWidgets import (
 )
 
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.presentation import StatusBadge, enhance
 from shared.framework import Confirmation, ConnectionStatus, RpcConnect
 
 
@@ -72,13 +73,14 @@ class ConnectionPanel(QWidget):
             button.clicked.connect(action)
             buttons.addWidget(button)
         layout.addLayout(buttons)
-        self.message = QLabel(self.status.message)
+        self.message = StatusBadge(self.status.message)
         self.message.setTextFormat(Qt.TextFormat.PlainText)
         self.message.setWordWrap(True)
         layout.addWidget(self.message)
         layout.addStretch()
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.error)
+        enhance(self)
 
     def choose_certificate(self) -> None:
         path, _ = QFileDialog.getOpenFileName(

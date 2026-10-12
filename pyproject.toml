@@ -48,7 +48,7 @@ dev = [
 include = ["backend*", "frontend*", "shared*", "toolkit*"]
 
 [tool.setuptools.package-data]
-frontend = ["resources/themes/*.qss"]
+frontend = ["resources/themes/*.qss", "resources/icons/*", "resources/examples/*"]
 "toolkit.resources" = ["*.txt"]
 
 [tool.black]

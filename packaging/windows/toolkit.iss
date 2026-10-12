@@ -18,6 +18,7 @@ OutputBaseFilename=Toolkit-{#AppVersion}-Windows-x64-Setup
 Compression=lzma2
 SolidCompression=yes
 WizardStyle=modern
+SetupIconFile=..\..\frontend\resources\icons\toolkit.ico
 LicenseFile=..\..\COPYING
 UninstallDisplayIcon={app}\CybersecurityFundamentalsToolkit.exe
 [Files]

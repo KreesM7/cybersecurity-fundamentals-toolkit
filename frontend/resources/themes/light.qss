@@ -1,8 +1,31 @@
-QWidget { background: #f5f7f9; color: #17212b; font-size: 14px; }
-QListWidget { border: 0; border-right: 1px solid #a9b4c0; padding: 12px; }
-QListWidget::item { padding: 6px 8px; }
-QListWidget::item:selected { background: #dbeafa; color: #17212b; }
-QListWidget::item:disabled { color: #667585; }
-QPushButton { border: 1px solid #1765ad; padding: 6px 10px; text-align: left; }
-QPushButton:hover { background: #dbeafa; }
-QLabel#pageTitle { font-size: 26px; font-weight: 600; padding: 12px 0; }
+QWidget { background: @background; color: @foreground; font-family: "Segoe UI", "Noto Sans"; font-size: @fontpx; }
+QLabel#pageTitle { font-size: @titlepx; font-weight: 600; padding: @smpx 0; }
+QLabel[role="muted"], QLabel#hintBar { color: @muted; }
+QLabel#hintBar { border-top: @linepx solid @border; padding: @smpx; }
+QListWidget, QTreeWidget, QTableWidget, QPlainTextEdit, QLineEdit, QComboBox, QAbstractSpinBox { background: @surface; border: @linepx solid @border; padding: @xspx; selection-background-color: @selection; selection-color: @foreground; }
+QListWidget::item { min-height: @xlpx; padding: @xspx @smpx; }
+QListWidget::item:selected, QTreeWidget::item:selected { background: @selection; color: @foreground; }
+QListWidget::item:disabled { color: @muted; font-size: @smallpx; font-weight: 600; }
+QPushButton, QToolButton { border: @linepx solid @border; padding: @xspx @smpx; min-height: @xlpx; background: @surface; border-radius: @radiuspx; }
+QPushButton:hover, QToolButton:hover { background: @selection; }
+QPushButton[role="primary"] { background: @accent; color: @accent_text; border-color: @accent; }
+QPushButton[role="danger"] { color: @danger; border-color: @danger; }
+QPushButton:disabled, QToolButton:disabled { color: @muted; background: @background; border-color: @border; }
+QLineEdit:focus, QComboBox:focus, QAbstractSpinBox:focus, QPlainTextEdit:focus, QTreeWidget:focus, QListWidget:focus, QTableWidget:focus, QPushButton:focus, QToolButton:focus, QCheckBox:focus, QTabBar::tab:focus { border: @focuspx solid @accent; }
+QCheckBox { padding: @xspx; spacing: @smpx; }
+QTabWidget::pane { border: @linepx solid @border; }
+QTabBar::tab { padding: @smpx @lgpx; border-bottom: @focuspx solid @border; }
+QTabBar::tab:selected { border-bottom-color: @accent; font-weight: 600; background: @surface; }
+QHeaderView::section { background: @background; color: @foreground; padding: @smpx; border: 0; border-bottom: @linepx solid @border; text-align: left; }
+QProgressBar { border: @linepx solid @border; text-align: center; min-height: @smpx; }
+QProgressBar::chunk { background: @accent; }
+QLabel[state="failed"], QLabel[role="validation"] { color: @danger; }
+QLabel[state="ready"], QLabel[state="done"] { color: @success; }
+QLabel[state="running"] { color: @warning; }
+QToolTip { background: @surface; color: @foreground; border: @linepx solid @border; padding: @smpx; }
+QSplitter::handle { background: @border; }
+
+QCheckBox::indicator { width: @lgpx; height: @lgpx; border: @linepx solid @border; background: @surface; }
+QCheckBox::indicator:checked { background: @accent; image: url("@check_icon"); }
+QLabel[state="cancelled"] { color: @warning; }
+QLineEdit, QPlainTextEdit { placeholder-text-color: @muted; }

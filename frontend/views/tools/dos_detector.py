@@ -2,18 +2,16 @@
 
 from PyQt6.QtWidgets import QFormLayout, QSpinBox
 
+from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.tools.base import FilePanel
+from frontend.widgets.presentation import enhance
 from shared.tools import DoSOptions
 
 
 class Panel(FilePanel):
     tool_id, title = "dos-detector", "DoS Pattern Detector"
-    description = (
-        "Upload UTF-8 access logs or request CSV. Counts strictly above the threshold "
-        "in UTC one-second bins are flagged. A spike alone does not establish an attack. "
-        "Saved captures require the separate PCAP worker."
-    )
+    description = TOOL_DESCRIPTIONS["dos-detector"]
 
     def __init__(self, view_model: ToolsViewModel) -> None:
         super().__init__(view_model)
@@ -23,6 +21,7 @@ class Panel(FilePanel):
         form = QFormLayout()
         form.addRow("Requests per IP / second", self.threshold)
         self.controls.addLayout(form)
+        enhance(self)
 
     def options(self) -> DoSOptions:
         return DoSOptions(threshold=self.threshold.value())

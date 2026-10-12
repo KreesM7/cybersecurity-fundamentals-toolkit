@@ -15,6 +15,7 @@ from PyQt6.QtWidgets import (
 )
 
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.presentation import StatusBadge, enhance
 from shared.reports import ReportRequest
 from shared.tools import EmptyResponse, ToolJob
 
@@ -47,7 +48,7 @@ class ReportsPanel(QWidget):
         self.save.setEnabled(False)
         self.save.clicked.connect(self.save_as)
         root.addWidget(self.save)
-        self.message = QLabel("")
+        self.message = StatusBadge("")
         self.message.setTextFormat(Qt.TextFormat.PlainText)
         self.message.setWordWrap(True)
         root.addWidget(self.message)
@@ -58,6 +59,7 @@ class ReportsPanel(QWidget):
         self.timer.start()
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.error)
+        enhance(self)
 
     def generate(self) -> None:
         if self.vm.workspace_id and self.title.text().strip():

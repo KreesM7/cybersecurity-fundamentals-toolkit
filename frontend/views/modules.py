@@ -9,20 +9,22 @@ from PyQt6.QtWidgets import (
     QCheckBox,
     QComboBox,
     QFormLayout,
-    QHBoxLayout,
     QLabel,
     QLineEdit,
+    QListWidget,
+    QListWidgetItem,
     QPlainTextEdit,
     QPushButton,
-    QScrollArea,
-    QSplitter,
+    QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
-    QVBoxLayout,
     QWidget,
 )
 
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.examples import fill_example
+from frontend.widgets.module_editor import build_editor, render_options, validate_options
+from frontend.widgets.presentation import LoadingSkeleton, StatusBadge, enhance
 from shared.modules import (
     ModuleDetail,
     ModuleLaunch,
@@ -35,97 +37,54 @@ from shared.workspaces import TargetTransfer, TargetView
 
 
 class ModuleBrowser(QWidget):
+    query: QLineEdit
+    kind: QComboBox
+    rank: QComboBox
+    platform: QComboBox
+    tree: QTreeWidget
+    title: QLabel
+    description: QPlainTextEdit
+    favorite: QCheckBox
+    saved: QComboBox
+    saved_list: QListWidget
+    payload: QComboBox
+    advanced: QCheckBox
+    form: QFormLayout
+    target: QComboBox
+    owned: QCheckBox
+    run: QPushButton
+    output: QPlainTextEdit
+    steps: QTabWidget
+    summary: QPlainTextEdit
+    loading: LoadingSkeleton
+    status_badge: StatusBadge
+
     def __init__(self, vm: AppViewModel) -> None:
         super().__init__()
         self.vm = vm
         self.detail: ModuleDetail | None = None
         self.library = ModuleLibrary()
         self.fields: dict[str, QWidget] = {}
+        self.option_specs: dict[str, OptionSpec] = {}
+        self.option_rows: dict[str, tuple[QWidget, QLabel]] = {}
         self.target_id: UUID | None = None
-        root = QVBoxLayout(self)
-        root.addWidget(QLabel("Metasploit modules"))
-        filters = QHBoxLayout()
-        self.query = QLineEdit()
-        self.query.setPlaceholderText("Search modules; Enter to search")
-        self.kind, self.rank, self.platform = QComboBox(), QComboBox(), QComboBox()
-        self.kind.addItems(
-            ["", "auxiliary", "exploit", "post", "payload", "encoder", "nop", "evasion"]
-        )
-        self.rank.addItems(["", "manual", "low", "average", "normal", "good", "great", "excellent"])
-        self.platform.addItems(
-            ["", "windows", "linux", "unix", "multi", "osx", "android", "java", "php"]
-        )
-        self.kind.setItemText(0, "All types")
-        self.rank.setItemText(0, "All ranks")
-        self.platform.setItemText(0, "All platforms")
-        self.platform.setEditable(True)
-        search = QPushButton("Search")
-        for widget in (self.query, self.kind, self.rank, self.platform, search):
-            filters.addWidget(widget)
-        root.addLayout(filters)
-        split = QSplitter()
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Module", "Rank"])
-        split.addWidget(self.tree)
-        right = QWidget()
-        controls = QVBoxLayout(right)
-        self.title = QLabel("Connect in Settings, then search or choose a saved module.")
-        self.title.setTextFormat(Qt.TextFormat.PlainText)
-        self.title.setWordWrap(True)
-        controls.addWidget(self.title)
-        self.description = QPlainTextEdit()
-        self.description.setReadOnly(True)
-        self.description.setMaximumHeight(110)
-        controls.addWidget(self.description)
-        self.favorite = QCheckBox("Favorite")
-        self.favorite.setEnabled(False)
-        controls.addWidget(self.favorite)
-        self.saved = QComboBox()
-        self.saved.addItem("Favorites / recent modules", "")
-        controls.addWidget(self.saved)
-        self.payload = QComboBox()
-        self.payload.addItem("Payload (when applicable)", "")
-        controls.addWidget(self.payload)
-        scroll = QScrollArea()
-        scroll.setWidgetResizable(True)
-        form_widget = QWidget()
-        self.form = QFormLayout(form_widget)
-        scroll.setWidget(form_widget)
-        controls.addWidget(scroll, 1)
-        targets = QHBoxLayout()
-        self.target = QComboBox()
-        refresh = QPushButton("Refresh targets")
-        transfer = QPushButton("Use as RHOSTS")
-        for widget in (self.target, refresh, transfer):
-            targets.addWidget(widget)
-        controls.addLayout(targets)
-        self.owned = QCheckBox("I own these targets or have explicit permission to test them.")
-        controls.addWidget(self.owned)
-        self.run = QPushButton("Run selected module")
-        self.run.setEnabled(False)
-        controls.addWidget(self.run)
-        split.addWidget(right)
-        split.setSizes([350, 600])
-        root.addWidget(split, 1)
-        self.output = QPlainTextEdit()
-        self.output.setReadOnly(True)
-        self.output.setMaximumBlockCount(10000)
-        self.output.setMaximumHeight(140)
-        root.addWidget(self.output)
-        search.clicked.connect(self.search)
-        self.query.returnPressed.connect(self.search)
-        self.tree.currentItemChanged.connect(self.select)
-        self.favorite.toggled.connect(self.set_favorite)
-        self.saved.activated.connect(self.select_saved)
-        self.payload.activated.connect(self.select_payload)
-        refresh.clicked.connect(vm.targets)
-        transfer.clicked.connect(self.transfer)
-        self.run.clicked.connect(self.launch)
+        self.submitting = False
+        build_editor(self)
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.show_error)
         QTimer.singleShot(0, vm.refresh_workspaces)
+        enhance(self)
+
+    def validate(self, *_: object) -> bool:
+        return validate_options(self)
+
+    def try_example(self) -> None:
+        fill_example(self, "modules")
+        self.steps.setCurrentIndex(0)
 
     def search(self) -> None:
+        self.loading.show()
+        self.status_badge.setText("Searching…")
         self.output.appendPlainText("Searching…")
         self.vm.search_modules(
             self.query.text(),
@@ -140,6 +99,10 @@ class ModuleBrowser(QWidget):
             if isinstance(path, str):
                 self.clear_form()
                 self.vm.module_detail(path)
+
+    def choose_module(self, path: str) -> None:
+        self.clear_form()
+        self.vm.module_detail(path)
 
     def select_saved(self, index: int) -> None:
         path = self.saved.itemData(index)
@@ -156,6 +119,7 @@ class ModuleBrowser(QWidget):
 
     def clear_form(self) -> None:
         self.detail = None
+        self.submitting = False
         self.target_id = None
         self.owned.setChecked(False)
         self.run.setEnabled(False)
@@ -163,33 +127,7 @@ class ModuleBrowser(QWidget):
         self.render_fields([])
 
     def render_fields(self, fields: list[OptionSpec], *, append: bool = False) -> None:
-        if not append:
-            while self.form.rowCount():
-                self.form.removeRow(0)
-            self.fields.clear()
-        for item in fields:
-            if item.name in self.fields:
-                continue
-            widget: QWidget
-            if item.kind == "bool":
-                checkbox = QCheckBox()
-                checkbox.setChecked(item.default is True)
-                widget = checkbox
-            elif item.choices:
-                combo = QComboBox()
-                combo.addItems(item.choices)
-                if item.default is not None:
-                    combo.setCurrentText(str(item.default))
-                widget = combo
-            else:
-                line = QLineEdit("" if item.default is None else str(item.default))
-                line.setMaxLength(4096)
-                if item.secret:
-                    line.setEchoMode(QLineEdit.EchoMode.Password)
-                widget = line
-            widget.setToolTip(escape(item.description))
-            self.form.addRow(item.name + (" *" if item.required else ""), widget)
-            self.fields[item.name] = widget
+        render_options(self, fields, append)
 
     def set_favorite(self, enabled: bool) -> None:
         if self.detail:
@@ -201,7 +139,7 @@ class ModuleBrowser(QWidget):
             self.vm.transfer_target(identifier)
 
     def launch(self) -> None:
-        if self.detail is None or self.vm.workspace_id is None:
+        if self.detail is None or self.vm.workspace_id is None or not self.validate():
             return
         values: dict[str, str | int | float | bool] = {}
         for name, widget in self.fields.items():
@@ -225,6 +163,7 @@ class ModuleBrowser(QWidget):
         except ValidationError:
             self.output.appendPlainText("Check the module fields before running.")
             return
+        self.submitting = True
         self.run.setEnabled(False)
         self.output.appendPlainText(
             "Launch submitted. An uncertain command will never repeat automatically."
@@ -238,6 +177,7 @@ class ModuleBrowser(QWidget):
             self.vm.module_library()
             self.vm.targets()
         elif key == "module-search" and isinstance(value, ModuleSearch):
+            self.loading.hide()
             self.tree.clear()
             groups: dict[str, QTreeWidgetItem] = {}
             for row in value.modules:
@@ -249,6 +189,9 @@ class ModuleBrowser(QWidget):
                 item.setToolTip(0, escape(row.name))
                 group.addChild(item)
             self.tree.expandAll()
+            self.status_badge.setText(
+                f"{len(value.modules)} matches. Select a module to configure."
+            )
             self.output.appendPlainText(
                 f"{len(value.modules)} matches."
                 + (" First 2,000 shown; refine your search." if value.truncated else "")
@@ -267,20 +210,26 @@ class ModuleBrowser(QWidget):
                 self.payload.addItem(path, path)
             self.payload.setEnabled(bool(value.payloads))
             self.render_fields(value.options)
-            self.run.setEnabled(
-                value.path.split("/", 1)[0] in {"auxiliary", "exploit", "post", "evasion"}
-            )
+            self.steps.setCurrentIndex(1)
+            self.validate()
         elif key == "payload-detail" and isinstance(value, ModuleDetail):
             if value.path == "payload/" + str(self.payload.currentData()):
                 self.render_fields(value.options, append=True)
         elif key in {"module-library", "module-favorite"} and isinstance(value, ModuleLibrary):
             self.library = value
             self.saved.clear()
+            self.saved_list.clear()
             self.saved.addItem("Favorites / recent modules", "")
             for path in value.favorites:
-                self.saved.addItem("★ " + path, path)
+                self.saved.addItem("Favorite: " + path, path)
+                saved_item = QListWidgetItem("Favorite: " + path)
+                saved_item.setData(Qt.ItemDataRole.UserRole, path)
+                self.saved_list.addItem(saved_item)
             for path in value.recent:
                 self.saved.addItem("Recent: " + path, path)
+                saved_item = QListWidgetItem("Recent: " + path)
+                saved_item.setData(Qt.ItemDataRole.UserRole, path)
+                self.saved_list.addItem(saved_item)
         elif key == "targets" and isinstance(value, RootModel):
             self.target.clear()
             for row in value.root:
@@ -296,7 +245,8 @@ class ModuleBrowser(QWidget):
             self.output.appendPlainText(
                 f"{value.status}: {value.path} · Framework job {value.remote_job_id or 'none'}"
             )
-            self.run.setEnabled(self.detail is not None)
+            self.submitting = False
+            self.validate()
             self.vm.module_library()
         elif key == "event" and isinstance(value, dict) and value.get("topic") == "module-launch":
             if value.get("workspace_id") == str(self.vm.workspace_id):
@@ -304,7 +254,10 @@ class ModuleBrowser(QWidget):
 
     def show_error(self, key: str, message: str) -> None:
         if key.startswith("module") or key in {"targets", "target-transfer", "payload-detail"}:
+            self.loading.hide()
+            self.status_badge.setText("Failed: " + message)
             self.output.appendPlainText(message)
             if key == "module-launch":
                 self.output.appendPlainText("Check Jobs before submitting another launch.")
-                self.run.setEnabled(self.detail is not None)
+                self.submitting = False
+            self.validate()

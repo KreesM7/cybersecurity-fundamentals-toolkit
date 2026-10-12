@@ -13,19 +13,16 @@ from PyQt6.QtWidgets import (
     QTableWidgetItem,
 )
 
+from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.tools.base import ToolPanel
+from frontend.widgets.presentation import enhance
 from shared.tools import SQLField, SQLForm, SQLOptions
 
 
 class Panel(ToolPanel):
     tool_id, title = "sql-checker", "SQL Injection Checker"
-    description = (
-        "Test only applications you own or have permission to assess. "
-        "Even benign POST inputs can change application data. This sends only single, "
-        "double and doubled quote probes after two stable baselines; findings are "
-        "possible issues, not proof of exploitability."
-    )
+    description = TOOL_DESCRIPTIONS["sql-checker"]
 
     def __init__(self, view_model: ToolsViewModel) -> None:
         super().__init__(view_model)
@@ -56,6 +53,7 @@ class Panel(ToolPanel):
         self.actions_layout.insertWidget(1, self.test_button)
         self.url.textChanged.connect(self._target_changed)
         self.forms.currentIndexChanged.connect(self._select)
+        enhance(self)
 
     def _target_changed(self, value: str) -> None:
         self.target_generation += 1

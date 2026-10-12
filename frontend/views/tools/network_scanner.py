@@ -2,23 +2,20 @@
 
 from PyQt6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton
 
+from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.tools.base import ToolPanel
+from frontend.widgets.presentation import enhance
 from shared.tools import InterfaceView, ScannerOptions
 
 
 class Panel(ToolPanel):
     tool_id, title = "network-scanner", "Network Scanner"
-    description = (
-        "TCP connect scans of authorized IPv4 addresses or CIDRs (up to 256 whole addresses). "
-        "Selected interfaces require an RFC1918 contained subnet; entered targets use "
-        "system routing. Filtered ports leave host presence inconclusive."
-    )
+    description = TOOL_DESCRIPTIONS["network-scanner"]
 
     def __init__(self, view_model: ToolsViewModel) -> None:
         super().__init__(view_model)
         self.target = QLineEdit()
-        self.target.setPlaceholderText("Authorized IPv4 address or CIDR")
         self.interfaces = QComboBox()
         self.interfaces.addItem("Entered target (system routing)", None)
         refresh = QPushButton("Refresh interfaces")
@@ -33,6 +30,7 @@ class Panel(ToolPanel):
         self.controls.addLayout(form)
         self.controls.addWidget(self.owned)
         self.vm.interfaces_changed.connect(self._interfaces)
+        enhance(self)
 
     def _interfaces(self, values: object) -> None:
         self.interfaces.clear()

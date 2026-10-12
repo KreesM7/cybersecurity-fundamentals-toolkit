@@ -3,6 +3,7 @@
 from PyQt6.QtCore import Qt, QTimer, pyqtSlot
 from PyQt6.QtGui import QCloseEvent, QKeySequence, QShortcut
 from PyQt6.QtWidgets import (
+    QApplication,
     QDialog,
     QHBoxLayout,
     QLabel,
@@ -17,6 +18,9 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from frontend.help_text import COPY, field_help
+from frontend.icons import app_icon
+from frontend.theme import SIZE
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
@@ -28,6 +32,8 @@ from frontend.views.reports import ReportsPanel
 from frontend.views.tools import PANELS, create_panel
 from frontend.views.vault import VaultPanel
 from frontend.views.workspaces import ArtifactsPanel, TargetsPanel, WorkspacePanel
+from frontend.widgets.navigation import TITLE_ROLE, Navigation
+from frontend.widgets.presentation import FocusHelp, enhance, explain
 from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
 from shared.tools import ToolView
@@ -42,13 +48,13 @@ class MainWindow(QMainWindow):
         self._closing = False
         self._checking_close = False
         self.setWindowTitle("Cybersecurity Fundamentals Toolkit")
-        self.resize(1100, 740)
+        self.resize(SIZE["window_w"], SIZE["window_h"])
+        self.setWindowIcon(app_icon())
         central = QWidget()
         layout = QHBoxLayout(central)
         self.sidebar = QListWidget()
-        self.sidebar.setMinimumWidth(230)
-        self.sidebar.setMaximumWidth(250)
         self.sidebar.addItem("Dashboard")
+        self.page_indices: dict[str, int] = {"Dashboard": 0}
         self.stack = QStackedWidget()
         dashboard = QWidget()
         content = QVBoxLayout(dashboard)
@@ -71,9 +77,21 @@ class MainWindow(QMainWindow):
         self.stack.addWidget(dashboard)
         self.sidebar.currentItemChanged.connect(self._navigate)
         self.sidebar.setCurrentRow(0)
-        layout.addWidget(self.sidebar)
+        self.navigation = Navigation(self.sidebar, self.navigate_title)
+        layout.addWidget(self.navigation)
         layout.addWidget(self.stack, 1)
-        self.setCentralWidget(central)
+        shell = QWidget()
+        shell_layout = QVBoxLayout(shell)
+        shell_layout.addWidget(central, 1)
+        self.hint = QLabel(COPY["hint"])
+        self.hint.setObjectName("hintBar")
+        self.hint.setWordWrap(True)
+        shell_layout.addWidget(self.hint)
+        self.setCentralWidget(shell)
+        self.focus_help = FocusHelp(self.hint, self)
+        application = QApplication.instance()
+        if application:
+            application.installEventFilter(self.focus_help)
         view_model.health_changed.connect(self._show_health)
         view_model.error_changed.connect(self.error_label.setText)
         self.panels: dict[str, QWidget] = {}
@@ -86,14 +104,18 @@ class MainWindow(QMainWindow):
             view_model.tools_changed.connect(self._show_tools)
         if isinstance(view_model, AppViewModel):
             desktop_controls = DesktopControls(view_model)
+            desktop_controls.navigate_requested.connect(self.navigate_title)
             content.insertWidget(1, desktop_controls)
             workspace_panel = WorkspacePanel(view_model)
             activity_panel = ActivityPanel(view_model)
+            activity_panel.navigate_requested.connect(self.navigate_title)
             self.register_view("Workspaces", workspace_panel)
             self.register_view("Targets", TargetsPanel(view_model))
-            self.register_view("Modules", ModuleBrowser(view_model))
+            module_panel = ModuleBrowser(view_model)
+            activity_panel.module_requested.connect(module_panel.choose_module)
+            self.register_view("Modules", module_panel)
             self.register_view("Payloads", PayloadPanel(view_model))
-            self.register_view("Sessions / Jobs / Console", activity_panel)
+            self.register_view("Sessions & Jobs", activity_panel)
             self.register_view("Artifacts", ArtifactsPanel(view_model))
             self.register_view("Vault", VaultPanel(view_model))
             self.register_view("Reports", ReportsPanel(view_model))
@@ -101,7 +123,7 @@ class MainWindow(QMainWindow):
             for keys, callback in (
                 ("Ctrl+K", self.command_palette),
                 ("Ctrl+T", lambda: self.navigate_title("Modules")),
-                ("Ctrl+L", lambda: self.navigate_title("Sessions / Jobs / Console")),
+                ("Ctrl+L", lambda: self.navigate_title("Sessions & Jobs")),
                 ("Ctrl+S", workspace_panel.save_notes),
                 ("F5", activity_panel.refresh),
             ):
@@ -110,28 +132,33 @@ class MainWindow(QMainWindow):
             view_model.state_changed.connect(self._shutdown_result)
             view_model.action_error.connect(self._shutdown_error)
             view_model.watch_events("/ws/events")
+        self.navigation.populate(self.page_indices)
+        self.navigate_title("Dashboard")
+        enhance(self)
 
     def navigate_title(self, title: str) -> None:
-        for index in range(self.sidebar.count()):
-            item = self.sidebar.item(index)
-            if item and item.text() == title:
-                self.sidebar.setCurrentRow(index)
-                break
+        if title == "Sessions / Jobs / Console":
+            title = "Sessions & Jobs"
+        if title in self.page_indices:
+            self.stack.setCurrentIndex(self.page_indices[title])
+            for index in range(self.sidebar.count()):
+                item = self.sidebar.item(index)
+                if item and item.data(TITLE_ROLE) == title:
+                    self.sidebar.setCurrentRow(index)
+                    break
 
     def command_palette(self) -> None:
         dialog = QDialog(self)
         dialog.setWindowTitle("Go to page")
-        dialog.resize(420, 420)
+        dialog.resize(SIZE["dialog_w"], SIZE["dialog_h"])
         layout = QVBoxLayout(dialog)
         query = QLineEdit()
-        query.setPlaceholderText("Type a page name…")
+        explain(query, field_help("page_search"))
         choices = QListWidget()
         layout.addWidget(query)
         layout.addWidget(choices)
-        for index in range(self.sidebar.count()):
-            item = self.sidebar.item(index)
-            if item:
-                choices.addItem(item.text())
+        choices.addItems(list(self.page_indices))
+        enhance(dialog)
 
         def filter_pages(value: str) -> None:
             for index in range(choices.count()):
@@ -183,6 +210,7 @@ class MainWindow(QMainWindow):
     def register_view(self, title: str, view: QWidget) -> None:
         """Add a migrated panel when its implementation is ready."""
         index = self.stack.addWidget(view)
+        self.page_indices[title] = index
         item = QListWidgetItem(title)
         item.setData(Qt.ItemDataRole.UserRole, index)
         self.sidebar.addItem(item)
@@ -191,7 +219,8 @@ class MainWindow(QMainWindow):
     def _navigate(self, current: QListWidgetItem | None, previous: QListWidgetItem | None) -> None:
         if current is not None:
             index = current.data(Qt.ItemDataRole.UserRole)
-            self.stack.setCurrentIndex(index if isinstance(index, int) else 0)
+            if isinstance(index, int):
+                self.stack.setCurrentIndex(index)
 
     def closeEvent(self, event: QCloseEvent | None) -> None:  # noqa: N802 - Qt override
         if isinstance(self._vm, AppViewModel) and not self._closing:
@@ -201,6 +230,9 @@ class MainWindow(QMainWindow):
                 self._checking_close = True
                 self._vm.get("shutdown-check", "/api/v1/connection/shutdown-check", ShutdownCheck)
             return
+        application = QApplication.instance()
+        if application:
+            application.removeEventFilter(self.focus_help)
         for timer in self.findChildren(QTimer):
             timer.stop()
         self._vm.close()

@@ -2,19 +2,16 @@
 
 from PyQt6.QtWidgets import QDoubleSpinBox, QFormLayout, QSpinBox
 
+from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.tools.base import FilePanel
+from frontend.widgets.presentation import enhance
 from shared.tools import AnomalyOptions
 
 
 class Panel(FilePanel):
     tool_id, title = "anomaly-detector", "Network Anomaly Detector"
-    description = (
-        "Upload UTF-8 logs or CSV with timestamp, source_ip, bytes and protocol. "
-        "By default one-second bins compare against the preceding 30 bins; "
-        "absolute z-scores above 3 are flagged. At least 31 bins are needed by default. "
-        "Saved captures require the separate PCAP worker."
-    )
+    description = TOOL_DESCRIPTIONS["anomaly-detector"]
 
     def __init__(self, view_model: ToolsViewModel) -> None:
         super().__init__(view_model)
@@ -33,6 +30,7 @@ class Panel(FilePanel):
         ):
             form.addRow(label, control)
         self.controls.addLayout(form)
+        enhance(self)
 
     def options(self) -> AnomalyOptions:
         return AnomalyOptions(

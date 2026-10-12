@@ -1,7 +1,7 @@
 """Desktop preferences and dashboard controls using the shared asynchronous ViewModel."""
 
 from pydantic import RootModel
-from PyQt6.QtCore import Qt, QTimer, QUrl
+from PyQt6.QtCore import Qt, QTimer, QUrl, pyqtSignal
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
     QApplication,
@@ -18,6 +18,7 @@ from PyQt6.QtWidgets import (
 from frontend.theme import apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.connection import ConnectionPanel
+from frontend.widgets.presentation import StatusBadge, enhance
 from shared.desktop import DashboardSummary, DesktopSettings, UpdateNotice
 from shared.framework import ConnectionStatus
 from shared.vault import VaultStatus
@@ -25,6 +26,8 @@ from shared.workspaces import WorkspaceView
 
 
 class DesktopControls(QWidget):
+    navigate_requested = pyqtSignal(str)
+
     def __init__(self, vm: AppViewModel) -> None:
         super().__init__()
         self.vm = vm
@@ -39,7 +42,7 @@ class DesktopControls(QWidget):
         self.workspace.activated.connect(self.switch_workspace)
         root.addLayout(row)
         self.counts = QLabel("Loading workspace…")
-        self.status = QLabel("Framework offline · Vault locked")
+        self.status = StatusBadge("Framework offline · Vault locked")
         root.addWidget(self.counts)
         root.addWidget(self.status)
         self.welcome = QWidget()
@@ -53,6 +56,16 @@ class DesktopControls(QWidget):
         )
         welcome.setWordWrap(True)
         welcome_layout.addWidget(welcome)
+        for title, destination in (
+            ("1 · Create workspace", "Workspaces"),
+            ("2 · Add target", "Targets"),
+            ("3 · Run a module", "Modules"),
+        ):
+            step = QPushButton(title)
+            step.clicked.connect(
+                lambda checked=False, page=destination: self.navigate_requested.emit(page)
+            )
+            welcome_layout.addWidget(step)
         done = QPushButton("Got it")
         done.clicked.connect(self.finish_onboarding)
         welcome_layout.addWidget(done)
@@ -79,7 +92,7 @@ class DesktopControls(QWidget):
         form.addWidget(self.theme)
         self.updates = QCheckBox("Check GitHub for updates on startup (no downloads)")
         form.addWidget(self.updates)
-        self.message = QLabel("Loading settings…")
+        self.message = StatusBadge("Loading settings…")
         self.message.setTextFormat(Qt.TextFormat.PlainText)
         form.addWidget(self.message)
         retry = QPushButton("Retry loading settings")
@@ -103,6 +116,7 @@ class DesktopControls(QWidget):
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.error)
         self.load()
+        enhance(self)
 
     def load(self) -> None:
         self.vm.get("settings-load", "/api/v1/settings", DesktopSettings)
@@ -217,7 +231,7 @@ class DesktopControls(QWidget):
                 f"{value.state} · Vault {'unlocked' if self.vm.vault_token else 'locked'}"
             )
         elif key in {"vault-indicator", "vault-locked"}:
-            state = self.status.text().split(" · ")[0]
+            state = self.status.raw_text.split(" · ")[0]
             unlocked = isinstance(value, VaultStatus) and value.unlocked
             self.status.setText(f"{state} · Vault {'unlocked' if unlocked else 'locked'}")
 

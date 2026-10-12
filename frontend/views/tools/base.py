@@ -15,6 +15,8 @@ from PyQt6.QtWidgets import (
 )
 
 from frontend.viewmodels.tools_vm import ToolsViewModel
+from frontend.widgets.examples import fill_example
+from frontend.widgets.presentation import LoadingSkeleton, StatusBadge, enhance, guide_tabs
 from shared.tools import ToolJob, ToolOptions
 
 
@@ -47,14 +49,18 @@ class ToolPanel(QWidget):
             self.actions_layout.addWidget(button)
         self.actions_layout.addStretch()
         self.content.addLayout(self.actions_layout)
-        self.status = QLabel("Ready. Results stay in this session.")
+        self.status = StatusBadge("Ready. Results stay in this session.")
         self.status.setWordWrap(True)
         self.content.addWidget(self.status)
+        self.loading = LoadingSkeleton()
+        self.content.addWidget(self.loading)
         self.run_button.clicked.connect(self.run)
         self.cancel_button.clicked.connect(lambda: self.vm.cancel(self.tool_id))
         self.clear_button.clicked.connect(self.clear)
+        self.guide_tabs = guide_tabs(self, self.tool_id, lambda: fill_example(self, self.tool_id))
         self.vm.job_changed.connect(self._job)
         self.vm.tool_error.connect(self._error)
+        enhance(self)
 
     def options(self) -> ToolOptions:
         raise NotImplementedError
@@ -62,22 +68,26 @@ class ToolPanel(QWidget):
     def run(self) -> None:
         try:
             self.vm.submit(self.options())
+            self.loading.show()
             self.output.clear()
             self.status.setText("Submitting…")
         except ValueError:
             self.status.setText("Check the input limits and required fields.")
 
     def clear(self) -> None:
+        self.loading.hide()
         self.vm.clear(self.tool_id)
         self.output.clear()
         self.status.setText("Cleared.")
 
     def _error(self, tool_id: str, message: str) -> None:
         if tool_id == self.tool_id:
+            self.loading.hide()
             self.status.setText(message)
 
     def _job(self, tool_id: str, value: object) -> None:
         if tool_id == self.tool_id and isinstance(value, ToolJob):
+            self.loading.setVisible(value.status in {"queued", "running", "cancelling"})
             self.status.setText(value.error or value.progress or value.status.capitalize())
             if value.status == "succeeded":
                 self.show_result(value.result)
@@ -105,12 +115,12 @@ class FilePanel(ToolPanel):
         row = QHBoxLayout()
         self.file_path = QLineEdit()
         self.file_path.setReadOnly(True)
-        self.file_path.setPlaceholderText("Choose an input file (maximum 25 MiB)")
         browse = QPushButton("Choose file…")
         browse.clicked.connect(self.choose_file)
         row.addWidget(self.file_path, 1)
         row.addWidget(browse)
         self.controls.addLayout(row)
+        enhance(self)
 
     def choose_file(self) -> None:
         filename, _ = QFileDialog.getOpenFileName(self, "Choose input file")
@@ -122,5 +132,6 @@ class FilePanel(ToolPanel):
             self.status.setText("Choose a readable input file.")
             return
         self.vm.submit(self.options(), self.file_path.text())
+        self.loading.show()
         self.output.clear()
         self.status.setText("Uploading and analyzing…")

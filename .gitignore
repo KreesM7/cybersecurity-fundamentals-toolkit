@@ -20,3 +20,5 @@ dist/
 native/
 *.log
 !examples/*.log
+
+!frontend/resources/examples/*.log

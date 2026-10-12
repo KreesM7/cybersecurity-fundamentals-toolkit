@@ -1,39 +1,55 @@
 """Live scoped activity, explicit controls and bounded terminal output."""
 
 from urllib.parse import urlencode
-from uuid import UUID
 
 from pydantic import RootModel, SecretStr
-from PyQt6.QtCore import Qt, QTimer
+from PyQt6.QtCore import Qt, QTimer, pyqtSignal
 from PyQt6.QtWidgets import (
-    QHBoxLayout,
-    QLabel,
+    QCheckBox,
+    QComboBox,
     QLineEdit,
     QMessageBox,
     QPlainTextEdit,
     QPushButton,
+    QTabWidget,
     QTreeWidget,
     QTreeWidgetItem,
-    QVBoxLayout,
     QWidget,
 )
 
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.activity_controls import build_activity
+from frontend.widgets.activity_state import render_activity
+from frontend.widgets.presentation import StatusBadge, enhance
 from shared.activity import (
     ActionResult,
     ActivitySnapshot,
     ConsoleHandle,
-    ConsoleOpen,
     RemoteAction,
     RemoteItem,
     TerminalCommand,
     TerminalOutput,
 )
 from shared.framework import ConnectionStatus
+from shared.modules import ModuleLibrary
 from shared.tools import EmptyResponse, ToolJob
 
 
 class ActivityPanel(QWidget):
+    connection: StatusBadge
+    tabs: QTabWidget
+    tree: QTreeWidget
+    context: QComboBox
+    output: QPlainTextEdit
+    advanced: QCheckBox
+    activity_toolbar: QWidget
+    raw_controls: QWidget
+    command: QLineEdit
+
+    guided_stops: list[QPushButton]
+    module_requested = pyqtSignal(str)
+    navigate_requested = pyqtSignal(str)
+
     def __init__(self, vm: AppViewModel) -> None:
         super().__init__()
         self.vm = vm
@@ -44,50 +60,15 @@ class ActivityPanel(QWidget):
         self._loading = False
         self._reading = False
         self._selection: tuple[str, str] | None = None
-        root = QVBoxLayout(self)
-        root.addWidget(QLabel("Sessions, jobs and console"))
-        self.connection = QLabel(
-            "Connect to Metasploit in Settings. Local analysis jobs work offline."
-        )
-        root.addWidget(self.connection)
-        self.tree = QTreeWidget()
-        self.tree.setHeaderLabels(["Kind", "ID", "Name / state", "Peer", "Ownership"])
-        self.tree.currentItemChanged.connect(self.remember_selection)
-        root.addWidget(self.tree)
-        buttons = QHBoxLayout()
-        for title, callback in (
-            ("Refresh", self.refresh),
-            ("Import into workspace", self.claim),
-            ("Stop selected", self.stop),
-            ("Open session terminal", self.session_terminal),
-            ("Open console", self.open_console),
-            ("Close terminal view", self.close_terminal),
-            ("Redacted history", self.history),
-        ):
-            button = QPushButton(title)
-            button.clicked.connect(callback)
-            buttons.addWidget(button)
-        root.addLayout(buttons)
-        self.output = QPlainTextEdit()
-        self.output.setReadOnly(True)
-        self.output.setMaximumBlockCount(10000)
-        root.addWidget(self.output, 1)
-        command_row = QHBoxLayout()
-        self.command = QLineEdit()
-        self.command.setMaxLength(65536)
-        self.command.setPlaceholderText("Command for the explicitly opened terminal")
-        send = QPushButton("Send")
-        command_row.addWidget(self.command)
-        command_row.addWidget(send)
-        root.addLayout(command_row)
-        send.clicked.connect(self.send)
-        self.command.returnPressed.connect(self.send)
+        self.library = ModuleLibrary()
+        build_activity(self)
         vm.state_changed.connect(self.update_state)
         vm.action_error.connect(self.error)
         self.timer = QTimer(self)
         self.timer.setInterval(1000)
         self.timer.timeout.connect(self.tick)
         self.timer.start()
+        enhance(self)
 
     def tick(self) -> None:
         if self.isVisible():
@@ -195,6 +176,7 @@ class ActivityPanel(QWidget):
             self._reading = False
             self.vm.invalidate("terminal-output")
             self.output.clear()
+            self.tabs.setCurrentIndex(2)
             self.read_output()
 
     def open_console(self) -> None:
@@ -247,87 +229,7 @@ class ActivityPanel(QWidget):
             )
 
     def update_state(self, key: str, value: object) -> None:
-        if key == "workspace":
-            self.snapshot = self.terminal = None
-            self._selection = None
-            self.sequence = 0
-            self._loading = self._reading = False
-            self.tree.clear()
-            self.output.clear()
-            self.command.clear()
-        elif key == "activity-snapshot" and isinstance(value, ActivitySnapshot):
-            self._loading = False
-            self.snapshot = value
-            self.connection.setText("Framework " + str(value.framework_id))
-            # Preserve local rows when refreshing the remote snapshot.
-            for index in reversed(range(self.tree.topLevelItemCount())):
-                item = self.tree.topLevelItem(index)
-                if item and isinstance(item.data(0, Qt.ItemDataRole.UserRole), RemoteItem):
-                    self.tree.takeTopLevelItem(index)
-            for row in value.items:
-                item = QTreeWidgetItem(
-                    [
-                        row.kind,
-                        row.remote_id,
-                        row.name,
-                        row.peer,
-                        "This workspace" if row.workspace_id else "Unassigned — import to control",
-                    ]
-                )
-                item.setData(0, Qt.ItemDataRole.UserRole, row)
-                self.tree.addTopLevelItem(item)
-        elif key == "activity-local" and isinstance(value, RootModel):
-            for index in reversed(range(self.tree.topLevelItemCount())):
-                item = self.tree.topLevelItem(index)
-                if item and isinstance(item.data(0, Qt.ItemDataRole.UserRole), ToolJob):
-                    self.tree.takeTopLevelItem(index)
-            for job in value.root:
-                item = QTreeWidgetItem(
-                    ["Local", str(job.id), job.tool_id + " · " + job.status, "", "This workspace"]
-                )
-                item.setData(0, Qt.ItemDataRole.UserRole, job)
-                self.tree.addTopLevelItem(item)
-        elif key == "activity-connection" and isinstance(value, ConnectionStatus):
-            if value.instance_id and value.state != "Offline" and self.vm.workspace_id:
-                self.vm.mutate(
-                    "terminal-open",
-                    "POST",
-                    "/api/v1/activity/console",
-                    ConsoleHandle,
-                    ConsoleOpen(
-                        workspace_id=self.vm.workspace_id, framework_id=UUID(value.instance_id)
-                    ),
-                )
-        elif key == "terminal-open" and isinstance(value, ConsoleHandle):
-            self.terminal = value
-            self.terminal_kind = "console"
-            self.sequence = 0
-            self._reading = False
-            self.vm.invalidate("terminal-output")
-            self.output.clear()
-            self.read_output()
-        elif key == "terminal-output" and isinstance(value, TerminalOutput):
-            self._reading = False
-            self.sequence = value.sequence
-            if value.truncated:
-                self.output.appendPlainText(
-                    "Older terminal output was discarded at the display limit."
-                )
-            if value.lines:
-                self.output.appendPlainText("\n".join(value.lines))
-        elif key == "terminal-history" and isinstance(value, RootModel):
-            self.output.appendPlainText("\n".join(value.root))
-        elif key in {"terminal-command", "activity-action"}:
-            self.output.appendPlainText("Action completed.")
-            self.refresh()
-        elif (
-            key == "event"
-            and isinstance(value, dict)
-            and value.get("topic") in {"activity", "module-launch"}
-        ):
-            self.refresh()
-
-        self.restore_selection()
+        render_activity(self, key, value)
 
     def error(self, key: str, message: str) -> None:
         if key.startswith(("activity", "terminal")):

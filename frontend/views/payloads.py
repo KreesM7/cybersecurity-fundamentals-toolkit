@@ -21,7 +21,10 @@ from PyQt6.QtWidgets import (
     QWidget,
 )
 
+from frontend.help_text import option_help
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.widgets.examples import fill_example
+from frontend.widgets.presentation import enhance, explain, guide_tabs
 from shared.modules import ModuleDetail, ModuleSearch
 from shared.payloads import PayloadCatalog, PayloadRequest
 from shared.tools import EmptyResponse, ToolJob
@@ -39,7 +42,6 @@ class PayloadPanel(QWidget):
         root.addWidget(QLabel("Payload generator · dedicated installed msfvenom"))
         row = QHBoxLayout()
         self.search = QLineEdit()
-        self.search.setPlaceholderText("Filter payload names")
         find = QPushButton("Find payloads")
         row.addWidget(self.search)
         row.addWidget(find)
@@ -93,6 +95,8 @@ class PayloadPanel(QWidget):
         self.timer.setInterval(500)
         self.timer.timeout.connect(self.poll)
         self.timer.start()
+        self.guide_tabs = guide_tabs(self, "payloads", lambda: fill_example(self, "payloads"))
+        enhance(self)
 
     def search_payloads(self) -> None:
         self.vm.get(
@@ -185,6 +189,10 @@ class PayloadPanel(QWidget):
         elif key == "generator-detail" and isinstance(value, ModuleDetail):
             if value.path == self.payload.currentData():
                 self.detail = value
+                editors = {"LHOST": self.host, "LPORT": self.port}
+                for option in value.options:
+                    if option.name in editors:
+                        explain(editors[option.name], option_help(option))
                 self.output.appendPlainText(value.description)
         elif key in {"generator-start", "generator-job", "generator-cancel"} and isinstance(
             value, ToolJob

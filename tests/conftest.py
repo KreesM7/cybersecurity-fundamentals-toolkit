@@ -39,3 +39,15 @@ def local_tls_pair(tmp_path):
     )
     key_path.chmod(0o600)
     return cert_path, key_path
+
+
+@pytest.fixture(scope="session", autouse=True)
+def desktop_application():
+    """Keep one Qt application alive across native GUI tests and deferred deletes."""
+    from PyQt6.QtCore import QCoreApplication, QEvent
+    from PyQt6.QtWidgets import QApplication
+
+    application = QApplication.instance() or QApplication([])
+    yield application
+    QCoreApplication.sendPostedEvents(None, QEvent.Type.DeferredDelete)
+    application.processEvents()

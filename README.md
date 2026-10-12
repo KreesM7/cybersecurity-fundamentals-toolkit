@@ -1,10 +1,12 @@
+![Toolkit icon](frontend/resources/icons/toolkit-128.png)
+
 # Cybersecurity Fundamentals Toolkit
 
 One native desktop application with seven fundamentals tools, local workspaces, Metasploit integration, an encrypted credential vault, and reports. Python 3.11/3.12, PyQt6, and a private authenticated HTTPS/WSS backend run in one desktop process. Errors remain local; no telemetry is enabled.
 
 **Quick start:** install the unsigned Windows x64 package from [Releases](https://github.com/KreesM7/cybersecurity-fundamentals-toolkit/releases), then open **Cybersecurity Fundamentals Toolkit** from Start. Python is included. Alternatively, extract the entire portable ZIP and run its executable. The Linux AppImage targets Ubuntu 24.04+ x86_64. Nmap, libmagic, and Toolkit-MSF are separate optional prerequisites; setup messages identify affected tools.
 
-![Toolkit dashboard](docs/screenshots/dashboard.png)
+![Toolkit dashboard](docs/screenshots/dashboard-dark.png)
 
 The desktop backend listens only on loopback. This does **not** restrict authorized scan/web targets to localhost: the scanner accepts bounded IPv4 targets, and the SQL checker accepts validated local/public URLs. You must explicitly confirm testing permission. Traffic analysis reads saved files; there is no live capture or DoS traffic generation.
 
@@ -165,3 +167,17 @@ If startup fails, launch `Start-Toolkit.cmd` from the source checkout to read th
 ## Metasploit setup (v2)
 
 See [dedicated Toolkit-MSF provisioning and verified TLS connection](docs/MSFRPC_SETUP.md). This setup leaves other WSL distributions untouched.
+
+### Desktop navigation and guides
+
+Use the grouped sidebar or **Ctrl+K** to find any page. Each tool has Run and Guide tabs;
+**Try example** fills inputs without starting a test. Modules use Find, Configure, and
+Review & Run; permission must be confirmed for the selected module. Sessions, Jobs, and
+Console have separate tabs; raw console controls require the Advanced console toggle.
+Field help is available by focus, hover, and the question-mark buttons. Console **Save artifact**
+exports the redacted display to a local text file; it does not add a workspace catalog entry.
+
+[All desktop screenshots, both themes](docs/screenshots/README.md) use an offline fixture.
+Regenerate them with `python scripts/capture_ui.py`; regenerate app icon exports with
+`python scripts/render_app_icon.py`. The original Toolkit Line SVG glyphs share a 2-unit
+stroke and are licensed with the application under MIT.

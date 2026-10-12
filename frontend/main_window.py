@@ -34,6 +34,7 @@ from frontend.views.vault import VaultPanel
 from frontend.views.workspaces import ArtifactsPanel, TargetsPanel, WorkspacePanel
 from frontend.widgets.navigation import TITLE_ROLE, Navigation
 from frontend.widgets.presentation import FocusHelp, enhance, explain
+from shared.desktop import UpdateProgress, UpdateRequest
 from shared.framework import ShutdownCheck
 from shared.schemas import HealthResponse
 from shared.tools import ToolView
@@ -47,6 +48,8 @@ class MainWindow(QMainWindow):
         self._vm = view_model
         self._closing = False
         self._checking_close = False
+        self._installing = False
+        self.update_exit = False
         self.setWindowTitle("Cybersecurity Fundamentals Toolkit")
         self.resize(SIZE["window_w"], SIZE["window_h"])
         self.setWindowIcon(app_icon())
@@ -104,6 +107,8 @@ class MainWindow(QMainWindow):
             view_model.tools_changed.connect(self._show_tools)
         if isinstance(view_model, AppViewModel):
             desktop_controls = DesktopControls(view_model)
+            self.desktop_controls = desktop_controls
+            desktop_controls.install_requested.connect(self._begin_update)
             desktop_controls.navigate_requested.connect(self.navigate_title)
             content.insertWidget(1, desktop_controls)
             workspace_panel = WorkspacePanel(view_model)
@@ -239,10 +244,45 @@ class MainWindow(QMainWindow):
         if event is not None:
             event.accept()
 
+    def _begin_update(self) -> None:
+        if (
+            not self._installing
+            and isinstance(self._vm, AppViewModel)
+            and self.desktop_controls.install_button.isEnabled()
+        ):
+            self._installing = True
+            self.close()  # Reuse the owned-activity shutdown confirmation before preparing.
+
     def _shutdown_result(self, key: str, value: object) -> None:
+        if self._installing:
+            progress = value if isinstance(value, UpdateProgress) else None
+            if (
+                key == "event"
+                and isinstance(value, dict)
+                and value.get("topic") == "update-progress"
+            ):
+                progress = UpdateProgress.model_validate(value["data"])
+            if progress and progress.phase == "failed":
+                self._installing = False
+            if progress and progress.phase == "prepared":
+                self.update_exit = True
+                self._closing = True
+                self.close()
+                return
+
         if key == "shutdown-check" and isinstance(value, ShutdownCheck):
             self._checking_close = False
             if value.confirmation_required and not self._confirm_shutdown():
+                self._installing = False
+                return
+            if self._installing and isinstance(self._vm, AppViewModel):
+                self._vm.mutate(
+                    "update-apply",
+                    "POST",
+                    "/api/v1/updates/apply",
+                    UpdateProgress,
+                    UpdateRequest(version=self.desktop_controls.notice.version),
+                )
                 return
             self._closing = True
             self.close()
@@ -261,6 +301,13 @@ class MainWindow(QMainWindow):
         )
 
     def _shutdown_error(self, key: str, message: str) -> None:
+        if key == "update-apply":
+            self._installing = False
+        if key == "shutdown-check" and self._installing:
+            self._installing = False
+            self._checking_close = False
+            self.desktop_controls.error("update-apply", message)
+            return
         if key == "shutdown-check":
             self._checking_close = False
             if self._confirm_shutdown():

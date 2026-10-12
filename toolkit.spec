@@ -18,6 +18,7 @@ if sys.platform == 'win32':
 datas = (collect_data_files('toolkit.resources')
          + collect_data_files('frontend', includes=['resources/themes/*.qss', 'resources/icons/*', 'resources/examples/*'])
          + collect_data_files('backend.repositories.migrations', include_py_files=True)
+         + collect_data_files('backend', includes=['resources/*.ps1'])
          + collect_data_files('zxcvbn') + [
     (str(root / 'examples'), 'examples'),
     (str(root / 'README.md'), '.'),

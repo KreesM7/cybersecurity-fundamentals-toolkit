@@ -3,7 +3,7 @@
 from collections.abc import Callable
 
 from PyQt6.QtCore import QEvent, QObject, Qt
-from PyQt6.QtGui import QFontDatabase
+from PyQt6.QtGui import QFontDatabase, QPainter, QPaintEvent
 from PyQt6.QtWidgets import (
     QAbstractButton,
     QAbstractItemView,
@@ -237,7 +237,19 @@ class StatusBadge(QLabel):
         super().__init__(parent)
         self.setTextFormat(Qt.TextFormat.PlainText)
         self.setWordWrap(True)
+        self.setMargin(SPACE["xs"])
+        self.setContentsMargins(SIZE["icon"] + SPACE["sm"], 0, 0, 0)
         self.setText(text)
+
+    def paintEvent(self, event: QPaintEvent | None) -> None:  # noqa: N802
+        super().paintEvent(event)
+        painter = QPainter(self)
+        state = str(self.property("state"))
+        icon = "ready" if state == "done" else "failed" if state == "cancelled" else state
+        line_icon(icon).paint(
+            painter, SPACE["xs"], (self.height() - SIZE["icon"]) // 2, SIZE["icon"], SIZE["icon"]
+        )
+        painter.end()
 
     def setText(self, text: str | None) -> None:  # noqa: N802
         value = text or "Ready"
@@ -252,7 +264,10 @@ class StatusBadge(QLabel):
                 )
                 else (
                     "done"
-                    if any(w in value.lower() for w in ("done", "succeeded", "saved", "completed"))
+                    if any(
+                        w in value.lower()
+                        for w in ("done", "succeeded", "saved", "completed", "verified")
+                    )
                     else "ready"
                 )
             )

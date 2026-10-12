@@ -18,7 +18,8 @@ QTabBar::tab { padding: @smpx @lgpx; border-bottom: @focuspx solid @border; }
 QTabBar::tab:selected { border-bottom-color: @accent; font-weight: 600; background: @surface; }
 QHeaderView::section { background: @background; color: @foreground; padding: @smpx; border: 0; border-bottom: @linepx solid @border; text-align: left; }
 QProgressBar { border: @linepx solid @border; text-align: center; min-height: @smpx; }
-QProgressBar::chunk { background: @accent; }
+QProgressBar::chunk { background: @info; }
+QProgressBar[state="done"]::chunk { background: @success; }
 QLabel[state="failed"], QLabel[role="validation"] { color: @danger; }
 QLabel[state="ready"], QLabel[state="done"] { color: @success; }
 QLabel[state="running"] { color: @warning; }

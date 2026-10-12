@@ -7,8 +7,10 @@ from pathlib import Path
 
 import httpx
 
+from backend.events import EventHub
 from backend.platform_utils import assert_private_path, atomic_private_write
-from shared.desktop import DesktopSettings, UpdateNotice
+from backend.services.update_service import UpdateService, release_notice
+from shared.desktop import DesktopSettings, UpdateNotice, UpdateProgress
 
 REPOSITORY = "KreesM7/cybersecurity-fundamentals-toolkit"
 RELEASE_API = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
@@ -22,7 +24,8 @@ def stable_version(value: str) -> tuple[int, ...] | None:
 
 
 class DesktopService:
-    def __init__(self, profile: Path) -> None:
+    def __init__(self, profile: Path, hub: EventHub | None = None) -> None:
+        self.updater = UpdateService(profile, hub or EventHub())
         self.path = profile / "desktop.json"
         self.settings = DesktopSettings()
         self.notice = UpdateNotice()
@@ -47,6 +50,7 @@ class DesktopService:
                 # Only non-secret preferences are reset; application data is untouched.
                 self.settings = DesktopSettings()
                 self.etag = ""
+        await self.updater.start()
         self.schedule_check()
 
     def schedule_check(self) -> None:
@@ -124,7 +128,7 @@ class DesktopService:
                             if not self.settings.check_updates:
                                 return
                             self.notice = (
-                                UpdateNotice(version=tag, url=RELEASE_PAGE + tag)
+                                release_notice(tag, result)
                                 if version > (2, 0, 0)
                                 else UpdateNotice()
                             )
@@ -133,7 +137,16 @@ class DesktopService:
         except (httpx.HTTPError, TimeoutError, ValueError, OSError):
             pass  # Offline, malformed, rate limited and absent releases remain quiet.
 
+    async def download_update(self, version: str) -> UpdateProgress:
+        if version != self.visible_notice().version:
+            raise ValueError("Reload the current update notice.")
+        return await self.updater.download_update(self.notice)
+
+    async def apply_update(self, version: str) -> UpdateProgress:
+        return await self.updater.apply_update(version)
+
     async def close(self) -> None:
+        await self.updater.close()
         if self._task:
             self._task.cancel()
             await asyncio.gather(self._task, return_exceptions=True)

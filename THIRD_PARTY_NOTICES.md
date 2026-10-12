@@ -23,3 +23,12 @@ Relevant upstream terms: [PyQt](https://www.riverbankcomputing.com/software/pyqt
 ## Rebuilding or redistributing
 
 Preserve LICENSE, COPYING, these notices, and the generated dependency notices. Provide matching corresponding source and build scripts alongside binaries, including modified dependency sources if changed. Preserve the independent Scapy boundary. Re-audit inventories after any dependency, platform, or packaging change. We do not assert legal clearance for a third party's modified distribution.
+
+
+## Optional update verifier
+
+The Windows in-app updater downloads **Sigstore Cosign 3.1.3** on explicit download
+request, under the Apache-2.0 license; it is not vendored into the Python environment.
+The executable is SHA-256 pinned, checked before use, and used only to verify release
+bundles. Official source/license: https://github.com/sigstore/cosign/tree/v3.1.3 .
+Checksum source: https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign_checksums.txt .

@@ -44,6 +44,10 @@ class ThemeTokens:
     success: str
     warning: str
 
+    @property
+    def info(self) -> str:
+        return self.accent
+
 
 PALETTES = {
     "dark": ThemeTokens(
@@ -84,7 +88,7 @@ def load_theme(mode: Literal["system", "dark", "light"]) -> tuple[str, ThemeToke
         raise ValueError("Unknown theme")
     tokens = PALETTES[selected]
     stylesheet = files("frontend").joinpath(f"resources/themes/{selected}.qss").read_text("utf-8")
-    values = asdict(tokens) | SPACE | STYLE | {"control": SIZE["control"]}
+    values = asdict(tokens) | {"info": tokens.info} | SPACE | STYLE | {"control": SIZE["control"]}
     for key in sorted(values, key=len, reverse=True):
         stylesheet = stylesheet.replace("@" + key, str(values[key]))
     stylesheet = stylesheet.replace(

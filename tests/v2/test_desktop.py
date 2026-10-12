@@ -124,5 +124,5 @@ async def test_settings_api_and_dashboard(tmp_path):
                 "/api/v1/dashboard", params={"workspace_id": str(app.state.workspaces.active_id)}
             )
             assert response.status_code == 200 and response.json()["targets"] == 0
-            assert (await client.get("/api/v1/updates")).json() == {"version": "", "url": ""}
+            assert (await client.get("/api/v1/updates")).json() == UpdateNotice().model_dump()
     assert json.loads((tmp_path / "desktop.json").read_text())["settings"]["theme"] == "system"

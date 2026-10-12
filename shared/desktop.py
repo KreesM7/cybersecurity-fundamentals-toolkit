@@ -19,6 +19,28 @@ class DesktopSettings(SchemaModel):
 class UpdateNotice(SchemaModel):
     version: str = ""
     url: str = ""
+    installer_url: str = ""
+    installer_size: int = Field(default=0, ge=0)
+    checksums_url: str = ""
+    signature_url: str = ""
+    checksums_signature_url: str = ""
+
+
+class UpdateRequest(SchemaModel):
+    version: str = Field(max_length=32)
+
+
+class UpdateProgress(SchemaModel):
+    version: str = ""
+    phase: Literal[
+        "idle", "downloading", "verifying", "verified", "preparing", "prepared", "failed"
+    ] = "idle"
+    received: int = 0
+    total: int = 0
+    checksum_verified: bool = False
+    signature_verified: bool = False
+    message: str = ""
+    can_apply: bool = False
 
 
 class DashboardSummary(SchemaModel):

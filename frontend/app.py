@@ -6,13 +6,16 @@ import os
 import sys
 import tempfile
 from pathlib import Path
+from typing import cast
 
+from fastapi import FastAPI
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import QApplication, QLabel
 
 from backend.bootstrap import InstanceLocator
 from backend.platform_utils import get_config_dir
 from backend.tls import TLSMaterial
+from backend.update_handoff import consume_update_message, launch_pending_update
 from frontend.icons import app_icon
 from frontend.main_window import MainWindow
 from frontend.runtime import BackendThread, finish_backend
@@ -65,6 +68,11 @@ def main(argv: list[str] | None = None) -> int:
             locator.token.get_secret_value(),
         )
         window = MainWindow(model)
+        window.desktop_controls.owns_backend = owned
+        message = consume_update_message(profile, "2.0.0") if owned else ""
+        notification = window.statusBar()
+        if message and notification is not None:
+            notification.showMessage(message, 12000)
         models.append(model)
         windows.append(window)
         launcher.hide()
@@ -108,5 +116,18 @@ def main(argv: list[str] | None = None) -> int:
             if model.is_running:
                 model.close()
         finish_backend(backend, application, launcher)
+        if any(window.update_exit for window in windows) and backend.instance is not None:
+            try:
+                launch_pending_update(
+                    cast(FastAPI, backend.instance.server.config.app).state.desktop.updater
+                )
+            except (ValueError, OSError):
+                launcher.setText(
+                    "Update could not start. Close this window and reopen the app "
+                    "to retry in Settings."
+                )
+                launcher.show()
+                application.setQuitOnLastWindowClosed(True)
+                application.exec()
         if temporary is not None:
             temporary.cleanup()

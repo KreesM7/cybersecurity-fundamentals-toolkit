@@ -100,7 +100,7 @@ def create_app(
             app.state.mutations = MutationCoordinator(
                 SQLAlchemyMutationStore(service.catalog_sessions), profile=profile
             )
-            app.state.desktop = DesktopService(profile)
+            app.state.desktop = DesktopService(profile, hub)
             await app.state.desktop.start()
             tool_service = ToolService(service, jobs)
             app.state.tools = tool_service

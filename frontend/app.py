@@ -94,8 +94,9 @@ def main(argv: list[str] | None = None) -> int:
                     args.self_test_report.write_text(
                         json.dumps({"ok": True, "panels": window.stack.count()}), "utf-8"
                     )
-                window.close()
-                application.exit(0)
+                # Let the authenticated shutdown check complete before the event loop exits.
+                model.tools_changed.disconnect(finish)
+                QTimer.singleShot(0, window.close)
 
             model.tools_changed.connect(finish)
 

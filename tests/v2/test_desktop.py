@@ -126,3 +126,22 @@ async def test_settings_api_and_dashboard(tmp_path):
             assert response.status_code == 200 and response.json()["targets"] == 0
             assert (await client.get("/api/v1/updates")).json() == UpdateNotice().model_dump()
     assert json.loads((tmp_path / "desktop.json").read_text())["settings"]["theme"] == "system"
+
+
+def test_closed_viewmodel_drops_queued_callbacks():
+    import ssl
+    from uuid import uuid4
+
+    from frontend.viewmodels.app_vm import AppViewModel
+
+    viewmodel = AppViewModel("https://127.0.0.1:1", ssl.create_default_context(), "a" * 64)
+    received = []
+    viewmodel.state_changed.connect(lambda *args: received.append(args))
+    identifier = uuid4()
+    viewmodel._actions[identifier] = "settings-load"
+    viewmodel._action_scopes[identifier] = None
+    viewmodel.close()
+    viewmodel._result(identifier, DesktopSettings())
+    viewmodel._action_failed(identifier, "closed")
+    viewmodel._event(json.dumps({"topic": "resync"}))
+    assert received == []

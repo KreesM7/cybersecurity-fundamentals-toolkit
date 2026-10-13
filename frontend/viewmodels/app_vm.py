@@ -36,6 +36,7 @@ class AppViewModel(ToolsViewModel):
         parent: QObject | None = None,
     ) -> None:
         super().__init__(base_url, ssl_context, instance_token, transport=transport, parent=parent)
+        self._closing = False
         self.workspace_id: UUID | None = None
         self.vault_token: SecretStr | None = None
         self._vault_generation = 0
@@ -100,6 +101,8 @@ class AppViewModel(ToolsViewModel):
         # Mutations are never retried or discarded merely because another action follows.
 
     def _result(self, identifier: object, value: object) -> None:
+        if self._closing:
+            return
         if not isinstance(identifier, UUID):
             return
         key = self._actions.pop(identifier, None)
@@ -136,6 +139,8 @@ class AppViewModel(ToolsViewModel):
         self.state_changed.emit(key, value)
 
     def _action_failed(self, identifier: object, message: str) -> None:
+        if self._closing:
+            return
         if isinstance(identifier, UUID):
             key = self._actions.pop(identifier, None)
             self._action_scopes.pop(identifier, None)
@@ -144,6 +149,8 @@ class AppViewModel(ToolsViewModel):
                 self.action_error.emit(key, message)
 
     def _event(self, value: object) -> None:
+        if self._closing:
+            return
         if not isinstance(value, (str, bytes)):
             return
         try:
@@ -161,6 +168,11 @@ class AppViewModel(ToolsViewModel):
         self.state_changed.emit("event", event)
         if event.get("topic") in {"workspace-activated", "resync"}:
             self.refresh_workspaces()
+
+    def close(self) -> None:
+        """Ignore queued UI callbacks before the worker starts shutting down."""
+        self._closing = True
+        super().close()
 
     def refresh_workspaces(self) -> None:
         self.get("workspaces", "/api/v1/workspaces/", RootModel[list[WorkspaceView]])

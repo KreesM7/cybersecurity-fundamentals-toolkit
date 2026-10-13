@@ -482,7 +482,7 @@ class Stub {
     installed = tmp_path / "installer.exe.args"
     if failure is None:
         assert (
-            installed.read_text().splitlines()
+            installed.read_text(encoding="utf-8-sig").splitlines()
             == update_handoff.silent_install_command(tmp_path / "installer.exe", target)[1:]
         )
     else:
@@ -493,7 +493,7 @@ class Stub {
         if (tmp_path / "application.exe.args").exists():
             break
         time.sleep(0.05)
-    assert (tmp_path / "application.exe.args").read_text().splitlines() == [
+    assert (tmp_path / "application.exe.args").read_text(encoding="utf-8-sig").splitlines() == [
         "--profile",
         str(profile),
     ]

@@ -60,7 +60,6 @@ async def test_payload_job_streams_and_artifact_is_workspace_scoped(tmp_path, mo
             format="raw",
             lhost="127.0.0.1",
             lport=4444,
-            confirmed=True,
         )
         job = await service.generate(data, uuid4())
         async with asyncio.timeout(10):

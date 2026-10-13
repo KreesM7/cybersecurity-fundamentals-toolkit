@@ -1,4 +1,4 @@
-"""Safe sample filling; never submits requests or checks ownership."""
+"""Safe sample filling; never submits requests."""
 
 import sys
 from importlib.resources import files
@@ -40,7 +40,7 @@ def fill_example(panel: QWidget, key: str) -> None:
             widget.setPlainText(str(value))
         elif isinstance(widget, QSpinBox):
             widget.setValue(int(value))
-    for name in ("owned", "post"):
+    for name in ("post",):
         widget = getattr(panel, name, None)
         if isinstance(widget, QCheckBox):
             widget.setChecked(False)

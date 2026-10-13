@@ -2,7 +2,7 @@
 
 Source candidate: 2.2.0. Published installers remain 2.1.0; this work does not silently replace or publish them. LowREA remains a separate unfinished integration.
 
-Implemented: ten strict manifests; bundled educational guides; JSON-schema validation; passive local doctor and a visible startup checklist; manifest-driven cards and seven-section details; existing Metasploit page links; explicit ownership acknowledgment; four owned native sessions with workspace leases; Windows ConPTY and Linux OS PTY helper; input/resize/stop, bounded screen output, redacted readiness failures; durable UTC launch acknowledgments; explicit HTTPS web-console navigation; USB-serial metadata and a pluggable firmware transport; redacted, deduplicated workspace findings imports and existing HTML/PDF report summaries; keyboard labels, tooltips and terminal focus isolation. Native processes never follow startup checks automatically.
+Implemented: ten strict manifests; bundled educational guides; JSON-schema validation; passive local doctor and a visible startup checklist; manifest-driven cards and seven-section details; existing Metasploit page links; four owned native sessions with workspace leases; Windows ConPTY and Linux OS PTY helper; input/resize/stop, bounded screen output, redacted readiness failures; durable UTC launch records; explicit HTTPS web-console navigation; USB-serial metadata and a pluggable firmware transport; redacted, deduplicated workspace findings imports and existing HTML/PDF report summaries; keyboard labels, tooltips and terminal focus isolation. Native processes never follow startup checks automatically.
 
 ## Milestone record
 
@@ -31,3 +31,9 @@ Rulings: reuse PyQt6/FastAPI instead of Tauri because existing tested packaging,
 Release and deployment limits remain as listed above. No 2.2.0 installer was published, no vendor deployment/license was verified, and no firmware command was sent. Production profiles/vaults were not migrated in these checks.
 
 Final follow-up: interface-specific discovery supports headless TShark without the GUI binary. Windows and Linux SecDesk suites each passed 32 tests. Container cleanup distinguishes exited zombies from live children; Docker's test process uses an init reaper. The report fixture awaits the existing job-completion API with a bounded timeout, rather than asserting a two-second shared-runner disk-speed limit. Production report behavior and functional/redaction assertions remain unchanged.
+
+## Direct action update
+
+Run, Generate and Launch now submit directly, without ownership checkboxes or required ownership fields. Legacy acknowledgment fields remain accepted for client compatibility but are not enforcement gates. Audit records retain a supplied legacy acknowledgment; new requests do not fabricate one. Removed disclaimer documents, policy-based feature exclusions and name-based manifest bans. Adding a manifest no longer fails startup verification merely because the registry grows beyond ten tools. Actual OS privileges, missing providers, input validation, resource budgets, cancellation, credential protections and update verification still describe implementation behavior.
+
+Verified direct-action update: Windows full suite 432 passed, 8 skipped, 50 subtests passed; coverage 80.75%. Linux direct-action/native/UI subset 45 passed. Black, Ruff and strict mypy for Windows/Linux passed; Windows build and source/frozen startup each loaded all 18 panels. Independent review findings were fixed and rereview found no blocker. Auth/TLS/bootstrap/target-validation files and module-option validation remain unchanged.

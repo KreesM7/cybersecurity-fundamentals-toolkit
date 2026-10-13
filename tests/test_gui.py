@@ -138,16 +138,14 @@ class GuiTests(unittest.TestCase):
         panel.show_result({"anomalies": [{"zscore": None, "score_kind": "positive_infinity"}]})
         self.assertIn("∞", panel.output.toPlainText())
 
-    def test_sql_target_a_b_a_invalidates_forms_permission_and_post(self):
+    def test_sql_target_a_b_a_invalidates_forms_and_post(self):
         panel = self.window.panels["sql-checker"]
         generation = panel.target_generation
-        panel.owned.setChecked(True)
         panel.post.setChecked(True)
         original = panel.url.text()
         panel.url.setText("http://127.0.0.1:8001/")
         panel.url.setText(original)
         self.assertEqual(panel.target_generation, generation + 2)
-        self.assertFalse(panel.owned.isChecked())
         self.assertFalse(panel.post.isChecked())
         panel.show_result(
             {
@@ -177,7 +175,6 @@ class GuiTests(unittest.TestCase):
                 ],
             }
         )
-        panel.owned.setChecked(True)
         edited = "sensitive-edit-sentinel" + "x" * (65537 - 23)
         self.assertEqual(len(edited), 65537)
         panel.fields.item(0, 1).setText(edited)

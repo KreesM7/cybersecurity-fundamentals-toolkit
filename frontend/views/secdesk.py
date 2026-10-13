@@ -291,7 +291,7 @@ class SecDeskPanel(QWidget):
                 else "Unverified: no native failure captured."
             )
             + f"\n\n6. Error dictionary\n{errors}\n\n7. Launch\n"
-            + "Launch explicitly below after acknowledging ownership. "
+            + "Use the Launch controls below. "
             + "Terminals use the workspace working directory and tool PATH. "
             + "No command runs automatically."
         )
@@ -333,9 +333,6 @@ class SecDeskPanel(QWidget):
 
     def open_console(self) -> None:
         if not isinstance(self.current, ToolManifest) or not self.current.console:
-            return
-        if not self.native_controls.consent.isChecked():
-            self.status.set_status("Acknowledge ownership before opening a console", "failed")
             return
         try:
             url = ToolManifest.validate_link(self.console_url.text().strip())

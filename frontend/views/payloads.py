@@ -6,7 +6,6 @@ from uuid import UUID
 from pydantic import ValidationError
 from PyQt6.QtCore import QTimer
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QFileDialog,
     QFormLayout,
@@ -63,8 +62,6 @@ class PayloadPanel(QWidget):
         ):
             form.addRow(name, widget)
         root.addLayout(form)
-        self.owned = QCheckBox("I will use this only on systems I own or have permission to test.")
-        root.addWidget(self.owned)
         row = QHBoxLayout()
         self.generate, self.cancel, self.save = (
             QPushButton("Generate"),
@@ -130,7 +127,6 @@ class PayloadPanel(QWidget):
                 iterations=self.iterations.value(),
                 lhost=self.host.text(),
                 lport=self.port.value(),
-                confirmed=self.owned.isChecked(),
             )
         except ValidationError:
             self.output.appendPlainText("Check the generation fields.")
@@ -222,7 +218,6 @@ class PayloadPanel(QWidget):
             self.output.appendPlainText("Artifact saved.")
         elif key == "workspace":
             self.detail = None
-            self.owned.setChecked(False)
 
     def error(self, key: str, message: str) -> None:
         if key.startswith("generator") or key == "artifact-saved":

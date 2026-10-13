@@ -250,8 +250,6 @@ class ModuleService:
 
     async def launch(self, data: ModuleRun, request_id: UUID) -> ModuleLaunch:
         async def action() -> ModuleLaunch:
-            if not data.confirmed:
-                raise ValueError("Confirm ownership or explicit permission before launch")
             if module_parts(data.path)[0] not in {"auxiliary", "exploit", "post", "evasion"}:
                 raise ValueError(
                     "This module type is metadata-only here; use Payloads for generation"

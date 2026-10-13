@@ -6,7 +6,7 @@ Connect through **Settings** using the dedicated RPC certificate and credentials
 
 Select a module for its description and editable options. Required fields have an asterisk; boolean and enumerated fields have appropriate editors, descriptions appear as tooltips, and password/token fields are masked. Exploits offer compatible payloads and their options. Favorites and the most recent 50 launches belong to the selected workspace.
 
-Select a saved target and choose **Use as RHOSTS**. Direct target inputs accept a literal IPv4 host or CIDR with at most 256 addresses; framework file lists and implicit range expansion are rejected. Confirm ownership or explicit testing permission before running. Auxiliary, exploit, post and evasion modules launch here; payloads, encoders and NOPs can be browsed but require generation rather than a module launch.
+Select a saved target and choose **Use as RHOSTS**. Direct target inputs accept a literal IPv4 host or CIDR with at most 256 addresses; framework file lists and implicit range expansion are rejected. Click Run to submit the module. Auxiliary, exploit, post and evasion modules launch here; payloads, encoders and NOPs can be browsed but require generation rather than a module launch.
 
 Launches capture the workspace and framework identity. A stable request ID prevents duplicate execution; conflicting duplicates are rejected and unknown outcomes are never repeated automatically. Refresh/reconcile framework jobs before a new launch after a connection failure. Output displays launch events without recording option values. Persistent launch associations retain only identifiers and status. Active or uncertain owned-console activity requires confirmation before closing; externally managed RPC servers remain running.
 

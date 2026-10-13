@@ -74,14 +74,13 @@ async def test_native_api_consent_idempotency_secret_transport_and_workspace_sco
             "workspace_id": str(workspace),
             "tool_id": "tcpdump",
             "mode": "terminal",
-            "authorized": True,
         }
         headers = {"Authorization": "Bearer " + "b" * 64, "X-Request-ID": str(uuid4())}
         async with httpx.AsyncClient(
             transport=httpx.ASGITransport(app), base_url="https://localhost"
         ) as client:
             assert (await client.post("/api/v1/secdesk/launch", json=body)).status_code == 401
-            for value in (False, 1, "true"):
+            for value in (1, "true"):
                 assert (
                     await client.post(
                         "/api/v1/secdesk/launch", json=body | {"authorized": value}, headers=headers
@@ -133,9 +132,9 @@ async def test_native_api_consent_idempotency_secret_transport_and_workspace_sco
             assert "[REDACTED]" in screen and "fixture-secret" not in screen
             await api.request("POST", "/api/v1/secdesk/close", NativeSnapshot, handle)
             assert app.state.secdesk.snapshot(handle).status == "closed"
-            assert all(
-                "fixture-secret" not in str(row) for row in await app.state.secdesk.audit(workspace)
-            )
+            audit = await app.state.secdesk.audit(workspace)
+            assert audit and not any(row.authorized for row in audit)
+            assert all("fixture-secret" not in str(row) for row in audit)
         finally:
             await api.close()
 
@@ -188,7 +187,6 @@ async def test_findings_upload_merge_redaction_isolation_and_console_ack(tmp_pat
                     "workspace_id": str(workspace),
                     "tool_id": "nessus",
                     "mode": "gui",
-                    "authorized": True,
                 },
             )
             assert console.json()["status"] == "acknowledged"
@@ -218,8 +216,6 @@ def test_secdesk_guides_native_controls_keyboard_and_findings_gui(monkeypatch):
     panel.update_state("secdesk-doctor", RootModel[list[Check]](checks))
     panel.show_tool(next(tool for tool in tools if tool.id == "tcpdump"))
     controls = panel.native_controls
-    assert not controls.terminal_button.isEnabled()
-    controls.consent.setChecked(True)
     assert controls.terminal_button.isEnabled()
     controls.launch("terminal")
     assert vm.calls[-1][1][2] == "/api/v1/secdesk/launch"
@@ -269,7 +265,7 @@ def test_secdesk_guides_native_controls_keyboard_and_findings_gui(monkeypatch):
     )
     panel.findings.error("secdesk-findings", "Rejected")
     controls.update_state("workspace", uuid4())
-    assert not controls.current() and not controls.consent.isChecked()
+    assert not controls.current() and not hasattr(controls, "consent")
     panel.deleteLater()
 
 

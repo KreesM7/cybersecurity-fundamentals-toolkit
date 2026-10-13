@@ -241,11 +241,9 @@ class MetasploitService:
         }
 
     async def run_module(
-        self, path: str, options: dict[str, JsonValue], *, owned: bool
+        self, path: str, options: dict[str, JsonValue], *, owned: bool = False
     ) -> dict[str, JsonValue]:
         kind, name = module_parts(path)
-        if not owned:
-            raise ValueError("Confirm ownership or permission before running a module.")
         return await self.call("module.execute", [kind, name, options])
 
     async def get_sessions(self) -> dict[str, JsonValue]:

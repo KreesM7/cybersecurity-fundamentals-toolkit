@@ -115,7 +115,7 @@ class SQLTests(unittest.TestCase):
         module = self.module()
         discovery = module.discover_forms(self.base + "/form")
         self.assertEqual(discovery.forms[0].fields, [("q", "hello")])
-        findings = module.test_form(discovery.url, discovery.forms[0], [("q", "hello")], owned=True)
+        findings = module.test_form(discovery.url, discovery.forms[0], [("q", "hello")])
         self.assertTrue(any("SQL error" in finding.evidence for finding in findings))
 
     def test_redirect_is_not_followed(self):
@@ -133,14 +133,12 @@ class SQLTests(unittest.TestCase):
         self.assertEqual(discovery.forms, [])
         self.assertTrue(discovery.notes)
 
-    def test_post_and_ownership_guards_precede_requests(self):
+    def test_post_method_opt_in_precedes_requests(self):
         module = self.module()
         form = module.FormSpec(self.base + "/search", "POST", [("q", "hello")])
         before = len(LabHandler.requests)
         with self.assertRaisesRegex(ValueError, "POST"):
             module.test_form(self.base + "/form", form, form.fields, owned=True)
-        with self.assertRaisesRegex(ValueError, "own"):
-            module.test_form(self.base + "/form", form, form.fields, allow_post=True)
         self.assertEqual(len(LabHandler.requests), before)
 
     def test_public_literal_target_is_accepted_using_controlled_transport(self):

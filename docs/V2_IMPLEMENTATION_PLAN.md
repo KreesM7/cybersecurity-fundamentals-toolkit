@@ -4,7 +4,7 @@ Status: approved requirements and implementation schedule. This document describ
 
 ## 1. Summary and licensing decision
 
-Upgrade the existing toolkit to a **PyQt6 frontend and local FastAPI backend**, preserving all seven tools, authorized public-target support, and the compact flat interface. Add the Metasploit, workspace, vault, reporting, and automation features from the v2 brief.
+Upgrade the existing toolkit to a **PyQt6 frontend and local FastAPI backend**, preserving all seven tools, public-target support, and the compact flat interface. Add the Metasploit, workspace, vault, reporting, and automation features from the v2 brief.
 
 The confirmed licensing decision is:
 
@@ -62,9 +62,9 @@ Port these existing modules into backend analysis services and matching PyQt6 pa
 |---|---|---|
 | Caesar Cipher — `caesar` | [caesar.py](../toolkit/modules/caesar.py) | ASCII shifts 1–25; preserve case and other characters; encryption/decryption round trips; all 25 candidates; 100,000-character input limit. |
 | Password Strength — `password-strength` | [password_strength.py](../toolkit/modules/password_strength.py) | zxcvbn estimates, `log2(guesses)`, attributed common-password list, illustrative rates of 10/10,000/10 billion guesses per second, 72-character limit, masked input and Clear; no plaintext or matched tokens in results/logs. |
-| Local Network Scanner — `network-scanner` | [network_scanner.py](../toolkit/modules/network_scanner.py) | Authorized public/private IPv4 hosts or CIDRs, maximum 256 addresses; optional attached-RFC1918-interface mode; existing 18-port preset; sequential bounded TCP connect scans; Responded versus Inconclusive results. |
+| Local Network Scanner — `network-scanner` | [network_scanner.py](../toolkit/modules/network_scanner.py) | Public/private IPv4 hosts or CIDRs, maximum 256 addresses; optional attached-RFC1918-interface mode; existing 18-port preset; sequential bounded TCP connect scans; Responded versus Inconclusive results. |
 | DoS Pattern Detector — `dos-detector` | [dos_detector.py](../toolkit/modules/dos_detector.py) | Saved access logs, CSV, PCAP/PCAPNG; UTC one-second bins; default 100 events/IP/second; flag strictly above threshold; requests versus packets labels; out-of-order and malformed-input handling. |
-| SQL Injection Checker — `sql-checker` | [sql_checker.py](../toolkit/modules/sql_checker.py) | Editable discovered forms; one selected form; two stable baselines; three quote-only probes across at most 12 fields; possible-issue wording; ownership confirmation and explicitly enabled POST. Preserve pinned DNS, same-origin actions, verified TLS, disabled redirects/proxies, one request/second, 40 requests/run, bounded sizes/timeouts, and stale-result rejection. |
+| SQL Injection Checker — `sql-checker` | [sql_checker.py](../toolkit/modules/sql_checker.py) | Editable discovered forms; one selected form; two stable baselines; three quote-only probes across at most 12 fields; possible-issue wording; the selected form and explicitly enabled POST. Preserve pinned DNS, same-origin actions, verified TLS, disabled redirects/proxies, one request/second, 40 requests/run, bounded sizes/timeouts, and stale-result rejection. |
 | Network Anomaly Detector — `anomaly-detector` | [anomaly_detector.py](../toolkit/modules/anomaly_detector.py) | Volume/protocol comparisons against preceding windows; defaults of one-second bins, 30-bin baseline, and absolute z-score above 3; insufficient-baseline and zero-variance reporting; existing detail limits. |
 | File Type Identifier — `file-type` | [file_type.py](../toolkit/modules/file_type.py) | MIME, signature description, extension mismatches; first-1-MiB sample; task-local libmagic handles; clear unreadable-file and missing-native-component errors. |
 

@@ -54,13 +54,12 @@ def test_browser_dynamic_fields_stale_payload_and_target_transfer():
     transfer = TargetTransfer(target_id=uuid4(), workspace_id=vm.workspace_id, rhosts="127.0.0.1")
     panel.update_state("target-transfer", transfer)
     assert panel.fields["RHOSTS"].text() == "127.0.0.1"
-    panel.owned.setChecked(True)
     panel.launch()
     request = vm.calls[-1][1][0]
-    assert request.target_id == transfer.target_id and request.confirmed
+    assert request.target_id == transfer.target_id and not request.confirmed
     assert not panel.run.isEnabled()
     panel.update_state("workspace", uuid4())
-    assert not panel.fields and panel.detail is None and not panel.owned.isChecked()
+    assert not panel.fields and panel.detail is None and not hasattr(panel, "owned")
     panel.deleteLater()
     app.processEvents()
 
@@ -146,13 +145,12 @@ def test_payload_controls_and_generation_request():
             path=path, framework_id=uuid4(), name="Fixture", description="Fixture", options=[]
         ),
     )
-    panel.owned.setChecked(True)
     panel.encoder.setCurrentIndex(1)
     panel.iterations.setValue(2)
     panel.start()
     request = vm.calls[-1][1][-1]
     assert request.encoder == "generic/none" and request.iterations == 2
-    assert request.format == "raw" and request.confirmed and request.lhost == "127.0.0.1"
+    assert request.format == "raw" and not request.confirmed and request.lhost == "127.0.0.1"
     assert not panel.generate.isEnabled() and not panel.save.isEnabled()
     panel.timer.stop()
     panel.deleteLater()

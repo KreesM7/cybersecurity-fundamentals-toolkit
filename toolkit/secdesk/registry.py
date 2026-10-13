@@ -98,18 +98,6 @@ class ToolManifest(Contract):
 
     @model_validator(mode="after")
     def validate_scope(self) -> ToolManifest:
-        if self.id in {
-            "nmap",
-            "kali",
-            "kali-linux",
-            "sprinto",
-            "john",
-            "john-the-ripper",
-            "kismac",
-            "burp",
-            "burp-suite",
-        }:
-            raise ValueError("Excluded tool or dedicated educational section")
         if self.terminal_recommended and not self.has_terminal:
             raise ValueError("Terminal recommendation requires a terminal interface")
         for error in self.errors:

@@ -167,15 +167,14 @@ async def test_redirect_large_response_and_cross_origin_guard(lab):
     assert len(requests) == before
 
 
-async def test_discovery_cross_origin_form_is_not_testable_and_unowned_sends_nothing(
-    tmp_path: Path, lab
-):
+async def test_discovery_needs_no_ack_and_cross_origin_form_is_not_testable(tmp_path: Path, lab):
     base, requests = lab
     app = create_app(TOKEN, "sql-guard", tmp_path)
     async with app.router.lifespan_context(app):
-        with pytest.raises(ValueError, match="permission"):
-            await app.state.tools.submit("sql-checker", SQLOptions(url=base + "/forms"))
-        assert requests == []
+        discovery = await app.state.tools.submit("sql-checker", SQLOptions(url=base + "/forms"))
+        await app.state.jobs.wait_idle()
+        assert app.state.jobs.get(discovery.id, discovery.workspace_id).status == "succeeded"
+        assert requests
         job = await app.state.tools.submit(
             "sql-checker", SQLOptions(url=base + "/foreign", owned=True)
         )

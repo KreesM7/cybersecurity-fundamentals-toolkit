@@ -7,7 +7,6 @@ from pydantic import RootModel, SecretStr
 from PyQt6.QtCore import QTimer, QUrl
 from PyQt6.QtGui import QDesktopServices
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QPlainTextEdit,
@@ -45,12 +44,6 @@ class NativeControls(QWidget):
         layout = QVBoxLayout(self)
         layout.setSpacing(SPACE["sm"])
         layout.setContentsMargins(0, 0, 0, 0)
-        self.consent = QCheckBox("I own or have permission for systems used in this tool session.")
-        self.consent.setAccessibleName(self.consent.text())
-        self.consent.setToolTip(
-            "Required for every launch. Terminal commands may affect external systems."
-        )
-        layout.addWidget(self.consent)
         actions = QHBoxLayout()
         self.gui = self.button("Launch native GUI", lambda: self.launch("gui"))
         self.terminal_button = self.button("Open in Terminal", lambda: self.launch("terminal"))
@@ -77,12 +70,11 @@ class NativeControls(QWidget):
         self.audit_output.setReadOnly(True)
         self.audit_output.setAccessibleName("Local launch audit")
         self.audit_output.setToolTip(
-            "Latest 200 local acknowledgments. Commands and output are not recorded."
+            "Latest 200 local launch records. Commands and output are not recorded."
         )
         self.audit_output.hide()
         layout.addWidget(self.button("Show local launch audit", self.audit))
         layout.addWidget(self.audit_output)
-        self.consent.toggled.connect(self.enable_launch)
         self.vm.state_changed.connect(self.update_state)
         self.vm.action_error.connect(self.error)
         self.timer = QTimer(self)
@@ -106,7 +98,6 @@ class NativeControls(QWidget):
     def set_tool(self, tool: ToolManifest) -> None:
         self.tool = tool
         self.console_pending = ""
-        self.consent.setChecked(False)
         self.pending = ""
         self.dimensions = None
         self.terminal.clear()
@@ -124,21 +115,9 @@ class NativeControls(QWidget):
             )
 
     def enable_launch(self) -> None:
-        self.gui.setEnabled(
-            bool(
-                self.vm.workspace_id
-                and self.tool
-                and self.tool.native_gui
-                and self.consent.isChecked()
-            )
-        )
+        self.gui.setEnabled(bool(self.vm.workspace_id and self.tool and self.tool.native_gui))
         self.terminal_button.setEnabled(
-            bool(
-                self.vm.workspace_id
-                and self.tool
-                and self.tool.has_terminal
-                and self.consent.isChecked()
-            )
+            bool(self.vm.workspace_id and self.tool and self.tool.has_terminal)
         )
         self.gui.setToolTip(
             "Launch the installed native GUI."
@@ -150,17 +129,15 @@ class NativeControls(QWidget):
         return self.sessions.get(self.selection.currentData())
 
     def launch(self, mode: str) -> None:
-        if not self.tool or not self.consent.isChecked() or self.vm.workspace_id is None:
+        if not self.tool or self.vm.workspace_id is None:
             return
         data = NativeLaunch.model_validate(
             {
                 "workspace_id": self.vm.workspace_id,
                 "tool_id": self.tool.id,
                 "mode": mode,
-                "authorized": True,
             }
         )
-        self.consent.setChecked(False)
         self.vm.invalidate("secdesk-sessions")
         self.status.set_status("Starting owned session", "running")
         self.vm.mutate("secdesk-launch", "POST", "/api/v1/secdesk/launch", NativeSnapshot, data)
@@ -255,7 +232,6 @@ class NativeControls(QWidget):
             self.console_pending = ""
             self.sessions.clear()
             self.selection.clear()
-            self.consent.setChecked(False)
             self.pending = ""
             self.audit_output.clear()
             self.select()
@@ -275,8 +251,7 @@ class NativeControls(QWidget):
         elif key == "secdesk-audit" and isinstance(value, RootModel):
             self.audit_output.setPlainText(
                 "\n".join(
-                    f"{row.created_at.isoformat()} {row.tool_id} {row.mode} "
-                    f"{row.event} authorized={row.authorized}"
+                    f"{row.created_at.isoformat()} {row.tool_id} {row.mode} " f"{row.event}"
                     for row in value.root
                     if isinstance(row, NativeAudit)
                 )
@@ -329,16 +304,13 @@ class NativeControls(QWidget):
             self.status.set_status(message + "; no command was repeated", "failed")
 
     def open_console(self, url: str) -> None:
-        if self.tool is None or self.vm.workspace_id is None or not self.consent.isChecked():
+        if self.tool is None or self.vm.workspace_id is None:
             return
         self.console_pending = url
-        self.consent.setChecked(False)
         self.vm.mutate(
             "secdesk-console",
             "POST",
             "/api/v1/secdesk/console",
             ActionResult,
-            NativeLaunch(
-                workspace_id=self.vm.workspace_id, tool_id=self.tool.id, mode="gui", authorized=True
-            ),
+            NativeLaunch(workspace_id=self.vm.workspace_id, tool_id=self.tool.id, mode="gui"),
         )

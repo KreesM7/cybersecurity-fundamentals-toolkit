@@ -124,11 +124,9 @@ class ToolService:
         if isinstance(options, ScannerOptions):
             from backend.services.async_scanner import validate_scan
 
-            # Ownership precedes interface inspection, Nmap discovery and every network action.
+            # Validate routing before Nmap discovery and every network action.
             validate_scan(options)
         if isinstance(options, SQLOptions):
-            if not options.owned:
-                raise ValueError("Confirm ownership or permission before loading forms or testing.")
             validate_url(options.url)
             if options.operation == "test":
                 self._sql_form(options, workspace_id)

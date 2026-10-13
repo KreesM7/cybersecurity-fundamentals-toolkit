@@ -67,8 +67,7 @@ async def test_native_service_authorization_ownership_audit_and_shutdown(tmp_pat
     from backend.services.workspace_service import WorkspaceService
     from shared.secdesk import NativeHandle, NativeInput, NativeLaunch, NativeResize
 
-    with pytest.raises(ValueError):
-        NativeLaunch(workspace_id=uuid4(), tool_id="tcpdump", mode="terminal", authorized=False)
+    assert not NativeLaunch(workspace_id=uuid4(), tool_id="tcpdump", mode="terminal").authorized
     workspaces = WorkspaceService(tmp_path)
     await workspaces.start()
     service = SecDeskService(workspaces, EventHub())
@@ -225,6 +224,53 @@ async def test_service_allows_tshark_only_terminal_and_rejects_missing_gui(tmp_p
         row = await service.open(launch)
         await service.stop(row)
         assert service.owned[row.id].released
+    finally:
+        await service.close()
+        await workspaces.close()
+
+
+async def test_failed_launch_recovery_preserves_only_supplied_legacy_ack(tmp_path, monkeypatch):
+    import shutil
+
+    import pyte
+
+    from backend.events import EventHub
+    from backend.services.secdesk_service import SecDeskService
+    from backend.services.workspace_service import WorkspaceService
+    from shared.secdesk import NativeLaunch
+
+    original = shutil.which
+    monkeypatch.setattr(
+        "toolkit.secdesk.registry.shutil.which",
+        lambda name: original(name) if name == "sh" else sys.executable,
+    )
+    workspaces = WorkspaceService(tmp_path)
+    await workspaces.start()
+    service = SecDeskService(workspaces, EventHub())
+    try:
+        with monkeypatch.context() as faults:
+
+            def unavailable_screen(*args, **kwargs):
+                raise ValueError("fixture renderer failure")
+
+            def failed_cleanup(self):
+                raise RuntimeError("fixture cleanup failure")
+
+            faults.setattr(pyte, "Screen", unavailable_screen)
+            faults.setattr(NativeTerminal, "close", failed_cleanup)
+            with pytest.raises(RuntimeError, match="cleanup"):
+                await service.open(
+                    NativeLaunch(
+                        workspace_id=workspaces.active_id,
+                        tool_id="tcpdump",
+                        mode="terminal",
+                        authorized=True,
+                    )
+                )
+        item = next(iter(service.owned.values()))
+        assert not item.released and item.permission_acknowledged
+        await service.stop(item.snapshot)
+        assert item.released and (await service.audit(workspaces.active_id))[0].authorized
     finally:
         await service.close()
         await workspaces.close()

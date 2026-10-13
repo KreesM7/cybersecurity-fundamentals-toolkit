@@ -55,6 +55,7 @@ class OwnedNative:
     lock: asyncio.Lock
     monitor: asyncio.Task[None] | None = None
     released: bool = False
+    permission_acknowledged: bool = False
 
 
 class SecDeskService:
@@ -72,7 +73,7 @@ class SecDeskService:
                     tool_id=item.snapshot.tool_id,
                     mode=item.snapshot.mode,
                     event=event,
-                    authorized=True,
+                    authorized=item.permission_acknowledged,
                     created_at=datetime.now(UTC),
                 )
             )
@@ -92,8 +93,8 @@ class SecDeskService:
 
     async def open(self, data: NativeLaunch) -> NativeSnapshot:
         tool = next((tool for tool in load_registry() if tool.id == data.tool_id), None)
-        if tool is None or not data.authorized:
-            raise ValueError("Registered tool and authorization are required")
+        if tool is None:
+            raise ValueError("Registered tool required")
         if data.mode == "terminal" and not tool.has_terminal:
             raise ValueError("Tool has no terminal interface")
         if data.mode == "gui" and not tool.native_gui:
@@ -166,6 +167,7 @@ class SecDeskService:
                     screen,
                     pyte.Stream(screen) if pyte else None,
                     asyncio.Lock(),
+                    permission_acknowledged=data.authorized,
                 )
                 # A launch without a durable acknowledgment is not accepted.
                 await self._audit(item, "launched")
@@ -196,6 +198,7 @@ class SecDeskService:
                             None,
                             None,
                             asyncio.Lock(),
+                            permission_acknowledged=data.authorized,
                         )
                     item.snapshot.status = "failed"
                     self.owned[item.snapshot.id] = item
@@ -333,7 +336,7 @@ class SecDeskService:
                         tool_id=tool.id,
                         mode="gui",
                         event="console-request",
-                        authorized=True,
+                        authorized=data.authorized,
                         created_at=datetime.now(UTC),
                     )
                 )

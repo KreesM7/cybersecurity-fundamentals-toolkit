@@ -15,8 +15,7 @@
   },
   "required_services": [],
   "required_permissions": [
-    "Supported adapter, driver and monitor mode for capture",
-    "Written authorization before radio testing"
+    "Supported adapter, driver and monitor mode for capture"
   ],
   "license": null,
   "overview": "Inspect Wi-Fi captures and test wireless security with the native CLI suite.",

@@ -23,7 +23,7 @@ analysis functions directly. Use the Caesar implementation as the smallest examp
    `ToolPanel` and `ToolsViewModel` request/progress handling. Capture workspace and
    input values at submission. Discard stale responses after edits or switches.
 5. Add controlled fixtures covering analysis, schema bounds, missing dependencies,
-   cancellation and navigation. Enforce network restrictions in analysis functions
+   cancellation and navigation. Validate network inputs in analysis functions
    before any network operation. Require independent review for new security boundaries.
 
 Both loaders discover registrations automatically. The PyInstaller spec collects

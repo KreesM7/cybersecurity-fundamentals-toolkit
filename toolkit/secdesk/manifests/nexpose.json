@@ -17,7 +17,7 @@
     "Security Console"
   ],
   "required_permissions": [
-    "Vendor activation and authorized site scope"
+    "Vendor activation"
   ],
   "license": "commercial",
   "overview": "Manage vulnerability assessments through the Security Console.",

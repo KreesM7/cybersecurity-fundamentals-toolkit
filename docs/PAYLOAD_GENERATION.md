@@ -1,6 +1,6 @@
 # Payload generation
 
-Provision Toolkit-MSF, connect in Settings, and open **Payloads**. Search for a payload, choose its output format and optional encoder, enter LHOST/LPORT and 1–10 encoding iterations, confirm authorized use, and select **Generate**. Metadata comes from the connected framework; generation uses the dedicated locally installed msfvenom. Keep their versions aligned.
+Provision Toolkit-MSF, connect in Settings, and open **Payloads**. Search for a payload, choose its output format and optional encoder, enter LHOST/LPORT and 1–10 encoding iterations, and select **Generate**. Metadata comes from the connected framework; generation uses the dedicated locally installed msfvenom. Keep their versions aligned.
 
 The panel displays bounded progress output, allows cancellation and offers **Save As** when generation succeeds. Save As downloads a workspace-owned artifact over the authenticated API, writes a temporary file beside your chosen destination, then atomically replaces the destination. Nothing generated is executed by the toolkit.
 

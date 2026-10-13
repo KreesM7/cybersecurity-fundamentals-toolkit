@@ -29,7 +29,7 @@ Work in small verified steps. Never claim a capability works until a test in thi
 4. **No behavior change:** existing host tests pass unchanged before and after. If the host has no tests, add none to host code.
 5. **Reuse, don't fork:** reuse host config/logging/process/error types only if they meet section 2; otherwise wrap behind a LowREA interface. Never modify them.
 6. **Wiring:** expose as a `<host> lowrea ...` subcommand namespace plus an MCP stdio entry, not a competing root CLI.
-7. **Docs:** under `docs/lowrea/` (DESIGN, HOST, PARITY, SCOPE, DISCLAIMER, AGENTS, capability matrix, benchmarks). Never overwrite the host README or AGENTS.md; append a short "LowREA" section with a link.
+7. **Docs:** under `docs/lowrea/` (DESIGN, HOST, PARITY, SCOPE, AGENTS, capability matrix, benchmarks). Never overwrite the host README or AGENTS.md; append a short "LowREA" section with a link.
 8. **CI:** a separate job running only LowREA checks plus the readiness verifier. Never slow or gate host jobs.
 9. **Rollback:** the integration must be removable by deleting the module directory and reverting the listed wiring edits. Verify once and record it.
 10. Prefer the smallest diff to host files.
@@ -67,25 +67,18 @@ Put these in `docs/lowrea/AGENTS.md`.
 
 1. **Observed, derived, inferred, unknown are four different things.** Never upgrade one into another. Decompiler output is an analysis observation, not original source. Missing coverage is unknown, never "absent". An empty call list with partial coverage is not proof of no calls.
 2. **Preserve provenance end to end:** artifact SHA-256, provider and version, analysis-profile digest, parameters, addresses or file offsets, limitations.
-3. **Static by default. Runtime only with explicit declared authority.** Launching, attaching, injecting, emulating, driving a browser, adb actions, writing memory or registers are effects. Tools declare effects truthfully; runtime tools require the caller to name the exact target and action.
+3. **Static by default. Runtime requires an explicit target and action.** Launching, attaching, injecting, emulating, driving a browser, adb actions, writing memory or registers are effects. Tools declare effects truthfully; runtime tools require the caller to name the exact target and action.
 4. **One owner per interpretation and per resource.** Parse once at the owning boundary with format-aware parsers. Never infer behavior from filenames or strings alone.
-5. **Fail closed.** Unresolved scope, authority, side effects or verification disables the capability and records an unknown.
+5. **Fail closed.** Unresolved side effects or verification disables the capability and records an unknown.
 6. **Resource ownership and cleanup are first-class.** Every process, debugger, emulator, browser, temp dir and database has an owner, deadline, cancellation and retryable cleanup. If cleanup fails, keep ownership and report it. PID plus path does not prove ownership after exit or reuse.
 7. **Token-efficient by design:** agent tokens/context first, then analysis time, then CPU/memory. Smallest sufficient answer with provenance and limits; page; summarize; retain full Evidence retrievably. No arbitrary result caps; limits come from real format/protocol/resource constraints and are reported when hit.
 8. **Config changes are additive, idempotent and backed up.** Never install or upgrade unrelated software. External engines are bring-your-own.
 9. **Redact only what is explicitly marked sensitive.** Never guess secrecy from names or patterns.
 10. **Model expected failures as typed errors** (tagged union plus `Result`), preserving partial facts and a meaningful reason.
 
-# 3. SCOPE BOUNDARIES **[REA]**
+# 3. FUNCTIONAL COVERAGE **[REA]**
 
-In scope: format inspection, disassembly, decompilation, xrefs, CFG/call-graph recovery, general static deobfuscation, archive extraction, vulnerability analysis, crash triage, diffing, evidence reporting, bounded declared runtime observation, interoperability, preservation and analysis of software the user owns or is authorized to examine.
-
-Out of scope. Do not build, stub or document workflows for:
-- defeating commercial packers or code-virtualization protections or recovering protected code (static detection is fine);
-- anti-debugging/anti-instrumentation evasion, DRM, license-check, anti-cheat or access-control bypass;
-- exploit or attack-payload generation, credential theft, persistence, unauthorized access, bulk attack tooling.
-
-Commercial engines (IDA, Hopper, JEB) must be legally obtained by the user; LowREA grants no license, key or activation. Put a `DISCLAIMER.md` in `docs/lowrea/`: the user must be authorized to analyze the target; "authorized use only" text does not itself contain misuse. Website, device and network analysis requires authorization for the target.
+The module covers format inspection, disassembly, decompilation, xrefs, CFG/call-graph recovery, static deobfuscation, archive extraction, vulnerability analysis, crash triage, diffing, evidence reporting, runtime observation, interoperability and preservation. A capability is available when its engine/provider implements it and its inputs and results are verified. Record missing providers or unsupported formats as implementation gaps.
 
 # 4. TECH STACK
 
@@ -232,8 +225,8 @@ Every runtime-capable tool (process, debugger, emulator, browser, adb, Frida) mu
 - Fix bugs at the producing boundary, not the downstream symptom; delete superseded code.
 - No abstractions until they remove observed complexity; no compatibility layers for code with no users.
 - Every host-file edit needs a stated reason in HOST.md.
-- If a request, example or dependency would cross section 3, stop, record it in `docs/lowrea/SCOPE.md`, and ask.
+- Record unavailable engines and unsupported formats in `docs/lowrea/SCOPE.md`.
 
 # 15. FINAL DELIVERABLES
 
-A module that passes its own checks, the readiness verifier AND the unchanged host suite, with: MCP server and CLI, builtin engine, Ghidra provider, runtime layer, skill and setup flow, PARITY.md (every REA tool accounted for), HOST.md (every touched host file plus rollback steps), DESIGN.md, SCOPE.md, DISCLAIMER.md, AGENTS.md, provider capability matrix stating exactly what each engine covers, benchmark report, generated tool catalog, and a README section with the 5-minute quick start and an honest "what is and is not verified" list.
+A module that passes its own checks, the readiness verifier AND the unchanged host suite, with: MCP server and CLI, builtin engine, Ghidra provider, runtime layer, skill and setup flow, PARITY.md (every REA tool accounted for), HOST.md (every touched host file plus rollback steps), DESIGN.md, SCOPE.md, AGENTS.md, provider capability matrix stating exactly what each engine covers, benchmark report, generated tool catalog, and a README section with the 5-minute quick start and an honest "what is and is not verified" list.

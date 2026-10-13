@@ -98,8 +98,6 @@ def scan_subnet(
 ) -> list[HostResult]:
 
     task = task or TaskContext()
-    if not authorized:
-        raise ValueError("Confirm ownership or permission to scan the target.")
     if interface is not None and interface not in list_interfaces():
         raise ValueError(
             "Selected interface changed or is unavailable. Refresh the interface list."

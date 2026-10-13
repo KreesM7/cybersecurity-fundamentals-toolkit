@@ -17,8 +17,6 @@ from toolkit.security import validate_subnet
 
 
 def validate_scan(options: ScannerOptions) -> None:
-    if not options.authorized:
-        raise ValueError("Confirm ownership or permission to scan the target.")
     interface = options.interface
     if interface is not None:
         selected = NetworkInterface(interface.name, interface.ip, interface.netmask)

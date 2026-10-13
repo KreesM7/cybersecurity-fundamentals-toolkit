@@ -116,8 +116,6 @@ def build_editor(owner: "ModuleBrowser") -> None:
     owner.summary = QPlainTextEdit()
     owner.summary.setReadOnly(True)
     review.addWidget(owner.summary)
-    owner.owned = QCheckBox("I own these targets or have explicit permission to test them.")
-    review.addWidget(owner.owned)
     owner.run = QPushButton("Run selected module")
     owner.run.setEnabled(False)
     review.addWidget(owner.run)
@@ -149,7 +147,6 @@ def build_editor(owner: "ModuleBrowser") -> None:
     refresh.clicked.connect(owner.vm.targets)
     transfer.clicked.connect(owner.transfer)
     owner.run.clicked.connect(owner.launch)
-    owner.owned.toggled.connect(owner.validate)
     owner.advanced.toggled.connect(owner.validate)
     owner.steps.currentChanged.connect(owner.validate)
     guide_tabs(owner, "modules", owner.try_example)
@@ -236,16 +233,8 @@ def validate_options(owner: "ModuleBrowser") -> bool:
         owner.detail
         and owner.detail.path.split("/", 1)[0] in {"auxiliary", "exploit", "post", "evasion"}
     )
-    owner.run.setEnabled(
-        bool(
-            valid
-            and allowed
-            and owner.vm.workspace_id
-            and owner.owned.isChecked()
-            and not owner.submitting
-        )
-    )
-    return bool(valid and allowed and owner.owned.isChecked() and not owner.submitting)
+    owner.run.setEnabled(bool(valid and allowed and owner.vm.workspace_id and not owner.submitting))
+    return bool(valid and allowed and not owner.submitting)
 
 
 def page_layout(tabs: QTabWidget, index: int) -> QVBoxLayout:

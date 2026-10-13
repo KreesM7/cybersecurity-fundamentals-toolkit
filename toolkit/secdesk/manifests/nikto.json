@@ -2,7 +2,7 @@
   "id": "nikto",
   "name": "Nikto",
   "category": "web-security",
-  "one_liner": "Inspect web server configuration with an explicit, authorized CLI scan.",
+  "one_liner": "Inspect web server configuration with an CLI scan.",
   "has_gui": false,
   "native_gui": false,
   "console": false,
@@ -15,11 +15,10 @@
   },
   "required_services": [],
   "required_permissions": [
-    "Perl runtime",
-    "Written authorization for web targets"
+    "Perl runtime"
   ],
   "license": null,
-  "overview": "Inspect web server configuration with an explicit, authorized CLI scan.",
+  "overview": "Inspect web server configuration with an CLI scan.",
   "setup_steps": [
     "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
     "Version, service, permission and license status are unknown until verified in the native tool or vendor console."

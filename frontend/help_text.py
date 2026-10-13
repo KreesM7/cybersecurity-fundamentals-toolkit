@@ -29,7 +29,7 @@ FIELDS = {
     ),
     "subnet": FieldHelp(
         "IPv4 subnet",
-        "Enter an authorized CIDR with at most 256 addresses.",
+        "Enter an IPv4 CIDR with at most 256 addresses.",
         "192.168.1.0/24",
         "Invalid or oversized subnets are rejected.",
     ),
@@ -55,10 +55,10 @@ FIELDS = {
         "A unique multi-word passphrase",
         "A wrong passphrase leaves the vault locked; wait before retrying.",
     ),
-    "address": FieldHelp("IPv4 address", "Enter one authorized IPv4 target.", "192.168.1.10"),
+    "address": FieldHelp("IPv4 address", "Enter one IPv4 target.", "192.168.1.10"),
     "target": FieldHelp(
         "Target",
-        "Choose or enter a target you have permission to assess.",
+        "Choose or enter a target address.",
         "192.168.1.10 or 192.168.1.0/24",
     ),
     "hostname": FieldHelp(
@@ -75,7 +75,7 @@ FIELDS = {
     "port": FieldHelp("Port", "Enter a TCP port between 1 and 65535.", "4444"),
     "url": FieldHelp(
         "Target URL",
-        "Enter the URL of a web application you are authorized to test.",
+        "Enter the URL of the web application to test.",
         "http://127.0.0.1:8000/",
     ),
     "file_path": FieldHelp(
@@ -168,11 +168,6 @@ FIELDS = {
     "theme": FieldHelp(
         "Appearance", "Choose dark, light, or the operating system preference.", "dark"
     ),
-    "owned": FieldHelp(
-        "Ownership confirmation",
-        "Confirm that you own the target or have explicit permission before testing.",
-        "Checked only for an approved lab",
-    ),
     "post": FieldHelp(
         "Enable POST",
         "Explicitly allow POST for the selected form; it may change application data.",
@@ -196,7 +191,7 @@ COPY = {
     "settings": "Open appearance and Metasploit connection settings.",
     "hint": "Tab to a field for guidance. Ctrl+K opens every page.",
     ("empty_console"): (
-        "No output yet. Choose a session or module. Open an authorized session, or "
+        "No output yet. Choose a session or module. Open a session, or "
         "review a module before running."
     ),
     ("advanced_warning"): (
@@ -209,8 +204,8 @@ COPY = {
     ),
     "required": "Required: enter a value.",
     "number": "Enter a valid number.",
-    "review": "Review target and options. Secrets remain hidden. Confirm ownership before Run.",
-    "example": "Fill a safe example only. No request runs and ownership remains unchecked.",
+    "review": "Review target and options. Secrets remain hidden. Click Run to submit.",
+    "example": "Fill example inputs. No request runs until you click Run.",
     "unknown_option": "The installed framework did not provide an option description.",
     "empty_table": "No rows yet. Refresh or select an item to get started.",
     "output": "Results appear here after an action. Review messages before retrying failures.",
@@ -287,11 +282,10 @@ GUIDES = {
     ),
     "network-scanner": (
         "Check a fixed common TCP port preset with Nmap.",
-        "Inventory an authorized lab subnet.",
+        "Inventory an IPv4 subnet.",
         (
             "Choose routing.",
             "Enter an IPv4 address or CIDR.",
-            "Confirm permission.",
             "Run and review responding versus inconclusive hosts.",
         ),
         "127.0.0.1/32 → open local ports or an inconclusive result.",
@@ -310,10 +304,10 @@ GUIDES = {
     ),
     "sql-checker": (
         "Compare baselines with three quote probes for possible SQL issues.",
-        "Check an explicitly authorized web form.",
+        "Check a selected web form.",
         (
             "Enter a local lab URL.",
-            "Confirm permission and load forms.",
+            "Load forms.",
             "Review one form and its values.",
             "Test; inspect evidence.",
         ),
@@ -346,12 +340,12 @@ GUIDES = {
     ),
     "modules": (
         "Find and configure installed Metasploit modules.",
-        "Assess targets within a written authorization scope.",
+        "Run installed modules against selected targets.",
         (
             "Find a module.",
             "Complete required options; expand advanced options if needed.",
             "Review the target and options.",
-            "Confirm ownership, then Run.",
+            "Click Run.",
         ),
         "Search scanner/http/title → matching installed modules.",
         (
@@ -361,18 +355,15 @@ GUIDES = {
     ),
     "payloads": (
         "Generate an artifact using your installed msfvenom.",
-        "Prepare authorized lab exercises.",
+        "Generate an artifact in the selected format.",
         (
             "Find and select a payload.",
             "Choose format and callback address/port.",
             "Review encoder settings.",
-            "Confirm permission, generate, and save.",
+            "Generate and save.",
         ),
         "LHOST 127.0.0.1, LPORT 4444 → lab callback configuration; generation stays manual.",
-        (
-            "Generated payloads can be dangerous. Do not deploy outside approved scope. "
-            "Encoding is not a safety guarantee."
-        ),
+        ("The installed framework supplies payloads, encoders and output formats."),
     ),
 }
 
@@ -381,7 +372,7 @@ GUIDE_HEADINGS = (
     "When to use it",
     "How to use it",
     "Example input + expected output",
-    "Limits & safety notes",
+    "Implementation notes",
 )
 
 
@@ -407,7 +398,7 @@ TOOL_DESCRIPTIONS = {
         "does not establish safety."
     ),
     ("network-scanner"): (
-        "TCP connect scans of authorized IPv4 addresses or CIDRs (up to 256 whole "
+        "TCP connect scans of IPv4 addresses or CIDRs (up to 256 whole "
         "addresses). Selected interfaces require an RFC1918 contained subnet; entered "
         "targets use system routing. Filtered ports leave host presence inconclusive."
     ),
@@ -418,8 +409,7 @@ TOOL_DESCRIPTIONS = {
         "and never saved or logged."
     ),
     ("sql-checker"): (
-        "Test only applications you own or have permission to assess. Even benign "
-        "POST inputs can change application data. This sends only single, double and "
+        "This sends single, double and "
         "doubled quote probes after two stable baselines; findings are possible "
         "issues, not proof of exploitability."
     ),

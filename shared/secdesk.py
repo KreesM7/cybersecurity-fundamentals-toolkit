@@ -13,14 +13,7 @@ class NativeLaunch(SchemaModel):
     workspace_id: Identifier
     tool_id: str = Field(min_length=1, max_length=64)
     mode: Literal["terminal", "gui"]
-    authorized: Literal[True]
-
-    @field_validator("authorized", mode="before")
-    @classmethod
-    def explicit_consent(cls, value: object) -> object:
-        if value is not True:
-            raise ValueError("Explicit ownership acknowledgment required")
-        return value
+    authorized: bool = False  # Legacy client field; never required for a launch.
 
 
 class NativeHandle(SchemaModel):

@@ -18,7 +18,7 @@ def app():
     application.processEvents()
 
 
-def test_module_review_requires_fields_and_explicit_ownership(app):
+def test_module_review_requires_fields_without_ownership_prompt(app):
     vm = ViewModelFixture()
     panel = ModuleBrowser(vm)
     panel.update_state(
@@ -35,14 +35,11 @@ def test_module_review_requires_fields_and_explicit_ownership(app):
         ),
     )
     assert not panel.run.isEnabled()
-    panel.owned.setChecked(True)
-    assert not panel.run.isEnabled()
     panel.fields["RHOSTS"].setText("127.0.0.1")
     assert panel.run.isEnabled()
     assert panel.steps.count() == 3
     assert panel.fields["RHOSTS"].toolTip()
-    panel.owned.setChecked(False)
-    assert not panel.run.isEnabled()
+    assert panel.run.isEnabled()
     panel.deleteLater()
 
 
@@ -265,12 +262,10 @@ def test_guided_module_selection_resets_ownership_before_fetch(app):
             ),
         )
         modules.target_id = uuid4()
-        modules.owned.setChecked(True)
         assert modules.run.isEnabled()
         update_context(activity, ModuleLibrary(favorites=["auxiliary/scanner/new"]))
         activity.context.setCurrentIndex(1)
         guided_run(activity)
-        assert not modules.owned.isChecked()
         assert not modules.run.isEnabled()
         assert modules.target_id is None
         assert modules.detail is None

@@ -18,7 +18,7 @@
     "Nessus service"
   ],
   "required_permissions": [
-    "Vendor license and authorized scan scope"
+    "Vendor license"
   ],
   "license": "commercial",
   "overview": "Use the vendor web console for licensed vulnerability scans.",

@@ -37,14 +37,12 @@ class Panel(ToolPanel):
         header = self.fields.horizontalHeader()
         if header is not None:
             header.setStretchLastSection(True)
-        self.owned = QCheckBox("I own this application or have permission to test it")
         self.post = QCheckBox("Enable POST testing for the selected form")
         form = QFormLayout()
         form.addRow("Target URL", self.url)
         form.addRow("Selected form", self.forms)
         self.controls.addLayout(form)
         self.controls.addWidget(self.fields)
-        self.controls.addWidget(self.owned)
         self.controls.addWidget(self.post)
         self.run_button.setText("Load forms")
         self.test_button = QPushButton("Test selected form")
@@ -61,7 +59,6 @@ class Panel(ToolPanel):
         self.discovered_forms.clear()
         self.forms.clear()
         self.fields.setRowCount(0)
-        self.owned.setChecked(False)
         self.post.setChecked(False)
         self.test_button.setEnabled(False)
         self.vm.clear(self.tool_id)
@@ -80,9 +77,7 @@ class Panel(ToolPanel):
         self.test_button.setEnabled(form is not None)
 
     def options(self) -> SQLOptions:
-        return SQLOptions(
-            url=self.url.text(), owned=self.owned.isChecked(), generation=self.target_generation
-        )
+        return SQLOptions(url=self.url.text(), generation=self.target_generation)
 
     def show_result(self, result: object) -> None:
         if isinstance(result, dict) and "discovery_id" in result:
@@ -114,7 +109,6 @@ class Panel(ToolPanel):
             options = SQLOptions(
                 operation="test",
                 url=self.source_url,
-                owned=self.owned.isChecked(),
                 allow_post=self.post.isChecked(),
                 generation=self.target_generation,
                 discovery_id=self.discovery_id,

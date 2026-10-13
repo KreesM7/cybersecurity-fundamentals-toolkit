@@ -136,10 +136,8 @@ class PayloadService:
         )
 
     async def generate(self, data: PayloadRequest, request_id: UUID) -> JobSnapshot:
-        if not data.confirmed or self.modules.identity() != str(data.framework_id):
-            raise MutationConflictError(
-                "Confirm permission and refresh the current framework metadata."
-            )
+        if self.modules.identity() != str(data.framework_id):
+            raise MutationConflictError("Refresh the current framework metadata.")
         catalog = await self.catalog()
         if data.format not in catalog.formats or (
             data.encoder and data.encoder not in catalog.encoders

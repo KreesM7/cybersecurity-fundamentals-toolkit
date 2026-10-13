@@ -6,7 +6,12 @@
   "has_gui": false,
   "native_gui": false,
   "console": false,
-  "embedded_pages": ["Settings", "Modules", "Sessions & Jobs", "Payloads"],
+  "embedded_pages": [
+    "Settings",
+    "Modules",
+    "Sessions & Jobs",
+    "Payloads"
+  ],
   "has_terminal": true,
   "terminal_recommended": true,
   "terminal_binary": "msfconsole",
@@ -17,9 +22,7 @@
   "required_services": [
     "PostgreSQL for database features"
   ],
-  "required_permissions": [
-    "Written authorization for each target"
-  ],
+  "required_permissions": [],
   "license": null,
   "overview": "Use framework modules through msfconsole and the existing authenticated Metasploit connection.",
   "setup_steps": [

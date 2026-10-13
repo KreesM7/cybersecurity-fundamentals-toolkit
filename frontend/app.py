@@ -90,7 +90,7 @@ def main(argv: list[str] | None = None) -> int:
                     failed("Seven tool panels could not be created.")
                     return
                 hubs = window.findChildren(SecDeskPanel)
-                if len(hubs) != 1 or hubs[0].registry_failed or len(hubs[0].tools) != 10:
+                if len(hubs) != 1 or hubs[0].registry_failed or not hubs[0].tools:
                     failed("SecDesk packaged resources could not be loaded.")
                     return
                 for index in range(window.stack.count()):

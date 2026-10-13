@@ -51,7 +51,6 @@ class ModuleBrowser(QWidget):
     advanced: QCheckBox
     form: QFormLayout
     target: QComboBox
-    owned: QCheckBox
     run: QPushButton
     output: QPlainTextEdit
     steps: QTabWidget
@@ -121,7 +120,6 @@ class ModuleBrowser(QWidget):
         self.detail = None
         self.submitting = False
         self.target_id = None
-        self.owned.setChecked(False)
         self.run.setEnabled(False)
         self.favorite.setEnabled(False)
         self.render_fields([])
@@ -158,7 +156,6 @@ class ModuleBrowser(QWidget):
                 workspace_id=self.vm.workspace_id,
                 target_id=self.target_id,
                 options=values,
-                confirmed=self.owned.isChecked(),
             )
         except ValidationError:
             self.output.appendPlainText("Check the module fields before running.")

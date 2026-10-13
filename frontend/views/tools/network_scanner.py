@@ -1,6 +1,6 @@
-"""Authorized system-routing or local-interface scanner inputs."""
+"""System-routing or local-interface scanner inputs."""
 
-from PyQt6.QtWidgets import QCheckBox, QComboBox, QFormLayout, QLineEdit, QPushButton
+from PyQt6.QtWidgets import QComboBox, QFormLayout, QLineEdit, QPushButton
 
 from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
@@ -20,15 +20,11 @@ class Panel(ToolPanel):
         self.interfaces.addItem("Entered target (system routing)", None)
         refresh = QPushButton("Refresh interfaces")
         refresh.clicked.connect(self.vm.refresh_interfaces)
-        self.owned = QCheckBox("I own this target or have permission to scan it")
-        self.target.textChanged.connect(lambda _: self.owned.setChecked(False))
-        self.interfaces.currentIndexChanged.connect(lambda _: self.owned.setChecked(False))
         form = QFormLayout()
         form.addRow("Target routing", self.interfaces)
         form.addRow("IPv4 address / CIDR", self.target)
         form.addRow(refresh)
         self.controls.addLayout(form)
-        self.controls.addWidget(self.owned)
         self.vm.interfaces_changed.connect(self._interfaces)
         enhance(self)
 
@@ -44,6 +40,5 @@ class Panel(ToolPanel):
         interface = self.interfaces.currentData()
         return ScannerOptions(
             target=self.target.text(),
-            authorized=self.owned.isChecked(),
             interface=interface if isinstance(interface, InterfaceView) else None,
         )

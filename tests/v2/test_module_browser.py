@@ -95,7 +95,6 @@ async def test_search_favorites_transfer_launch_and_idempotency(tmp_path):
                 "path": path,
                 "framework_id": fixture.identity,
                 "workspace_id": target.json()["workspace_id"],
-                "confirmed": True,
                 "target_id": target.json()["id"],
                 "options": {"RHOSTS": "127.0.0.1", "PASSWORD": "private-fixture-value"},
             }

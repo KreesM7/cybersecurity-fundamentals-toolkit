@@ -1,5 +1,5 @@
-# Scope
+# Implementation coverage
 
-Implemented: static regular-file byte identity and content-addressed evidence. No execution, attachment, emulation or network operation is performed by this slice.
+Implemented: static regular-file byte identity and content-addressed evidence. This slice does not implement execution, attachment, emulation or network operations.
 
-Planned features and exclusions are specified in DESIGN.md. Bypass of DRM, licensing, anti-cheat or access controls, anti-debugging evasion, recovery of protected commercial code, attack payloads, credential theft and unauthorized access are excluded. Inventory rows remain missing until their scope and producer tests are verified.
+Planned capabilities are described in DESIGN.md. Inventory rows remain missing until their engine/provider and producer tests are implemented and verified.

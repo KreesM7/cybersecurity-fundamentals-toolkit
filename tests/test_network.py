@@ -108,16 +108,14 @@ class NetworkTests(unittest.TestCase):
                 "subprocess.run", return_value=SimpleNamespace(returncode=0, stdout=xml, stderr=b"")
             ) as run,
         ):
-            results = module.scan_subnet("93.184.216.34", authorized=True)
+            results = module.scan_subnet("93.184.216.34")
         self.assertEqual(results[0].ip, "93.184.216.34")
         self.assertEqual(results[0].status, "Responded")
         self.assertIn("93.184.216.34", run.call_args.args[0])
 
-    def test_ownership_and_invalid_custom_targets_stop_before_nmap(self):
+    def test_invalid_custom_targets_stop_before_nmap(self):
         module = self.module()
         with patch("subprocess.run", side_effect=AssertionError("No scan should start")):
-            with self.assertRaisesRegex(ValueError, "permission|authorize|own"):
-                module.scan_subnet("93.184.216.34")
             for target in ("93.184.216.0/23", "224.0.0.1", "::1"):
                 with self.subTest(target=target), self.assertRaises(ValueError):
                     module.scan_subnet(target, authorized=True)

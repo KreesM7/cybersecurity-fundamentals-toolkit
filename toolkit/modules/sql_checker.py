@@ -330,10 +330,6 @@ def test_form(
     allow_post: bool = False,
     task: TaskContext | None = None,
 ) -> list[Finding]:
-    if not owned:
-        raise ValueError(
-            "Confirm ownership or permission to test this application before sending probes."
-        )
     base = validate_url(source_url)
     target = validate_form_action(base, form.action)
     if form.method == "POST" and not allow_post:

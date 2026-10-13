@@ -15,9 +15,7 @@ class NativeTerminalView(QPlainTextEdit):
         self.setFont(QFontDatabase.systemFont(QFontDatabase.SystemFont.FixedFont))
         self.setLineWrapMode(QPlainTextEdit.LineWrapMode.NoWrap)
         self.setAccessibleName("Owned native terminal")
-        self.setToolTip(
-            "Type into the authorized terminal. Close terminal stops its owned processes."
-        )
+        self.setToolTip("Type into the terminal. Close terminal stops its owned processes.")
 
     def event(self, event: QEvent | None) -> bool:
         if event is not None and event.type() == QEvent.Type.ShortcutOverride and self.isEnabled():

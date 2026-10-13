@@ -56,15 +56,21 @@ async def test_submission_results_and_workspace_lease(tmp_path: Path):
         await workspaces.close()
 
 
-async def test_unowned_scanner_never_creates_job(tmp_path: Path):
+async def test_scanner_needs_no_ack_and_releases_lease(tmp_path: Path, monkeypatch):
     workspaces = WorkspaceService(tmp_path)
     await workspaces.start()
     jobs = JobManager(EventHub())
     tools = ToolService(workspaces, jobs)
     try:
-        with pytest.raises(ValueError, match="permission"):
-            await tools.submit("network-scanner", ScannerOptions(target="127.0.0.1"))
-        assert not jobs.records
+
+        async def controlled_scan(options, context):
+            assert options.target == "127.0.0.1" and not options.authorized
+            return []
+
+        monkeypatch.setattr("backend.services.async_scanner.scan", controlled_scan)
+        job = await tools.submit("network-scanner", ScannerOptions(target="127.0.0.1"))
+        await jobs.wait_idle()
+        assert jobs.get(job.id, job.workspace_id).status == "succeeded"
         assert workspaces._engines[workspaces.active_id].references == 0
     finally:
         await jobs.close()

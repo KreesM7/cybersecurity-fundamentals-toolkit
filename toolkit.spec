@@ -16,7 +16,7 @@ if sys.platform == 'win32':
         str(windows / 'System32'), str(windows),
     ])
 datas = (collect_data_files('toolkit.resources')
-         + collect_data_files('toolkit.secdesk', includes=['registry.json', 'manifests/*.json'])
+         + collect_data_files('toolkit.secdesk', includes=['registry.json', 'guides.json', 'manifests/*.json'])
          + collect_data_files('frontend', includes=['resources/themes/*.qss', 'resources/icons/*', 'resources/examples/*'])
          + collect_data_files('backend.repositories.migrations', include_py_files=True)
          + collect_data_files('backend', includes=['resources/*.ps1'])
@@ -35,7 +35,7 @@ analysis = Analysis(
                    + collect_submodules('frontend.views')
                    + ['sqlalchemy.dialects.sqlite.aiosqlite',
                       'keyring.backends.Windows' if sys.platform == 'win32' else 'keyring.backends.SecretService',
-                      'aiosqlite', 'magic', 'nmap', 'zxcvbn', 'psutil', 'bs4', 'urllib3']),
+                      'serial.tools.list_ports', 'pyte', 'winpty' if sys.platform == 'win32' else 'ptyprocess', 'aiosqlite', 'magic', 'nmap', 'zxcvbn', 'psutil', 'bs4', 'urllib3']),
     hookspath=[],
     runtime_hooks=[],
     excludes=['tkinter', 'PySide6', 'shiboken6', 'scapy', 'toolkit_scapy_worker', 'pytest',

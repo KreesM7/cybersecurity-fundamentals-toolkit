@@ -4,4 +4,4 @@ Before any source edit, dependency change or rebuild, close the running dev inst
 
 For automated checks, use `python -m toolkit --self-test` with its disposable profile. For visible development use `python -m toolkit --profile work/secdesk-dev`. Stop that dev instance before further changes. Existing installed releases and user profiles remain separate.
 
-The initial SecDesk slice opens no capture devices, serial ports or native tool processes. Its doctor only locates executables. The existing authenticated backend owns its request threads and shutdown. Native launch/PTY lifecycle and hardware protocol work remain unverified and are not offered as actions yet.
+SecDesk owns explicitly launched native processes and PTYs until cleanup completes. Its doctor only observes local metadata; serial detection never opens a port. Firmware actions remain disabled. GUI fixtures use temporary profiles; the visible dev instance uses an isolated profile so schema changes cannot affect the installed release or the only copy of a vault. Back up before promoting source changes to a production profile.

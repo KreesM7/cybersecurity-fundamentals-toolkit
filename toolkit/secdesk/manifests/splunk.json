@@ -1,0 +1,62 @@
+{
+  "id": "splunk",
+  "name": "Splunk",
+  "category": "log-analysis",
+  "one_liner": "Search collected events in Splunk Web; use CLI for administration.",
+  "has_gui": true,
+  "native_gui": false,
+  "console": true,
+  "has_terminal": true,
+  "terminal_recommended": false,
+  "terminal_binary": "splunk",
+  "detect": {
+    "binary": "splunk",
+    "version_flag": "",
+    "windows_program_files_path": "Splunk/bin/splunk.exe"
+  },
+  "required_services": [
+    "splunkd"
+  ],
+  "required_permissions": [
+    "Authenticated console access; some CLI operations require administrator privileges"
+  ],
+  "license": "commercial",
+  "overview": "Search collected events in Splunk Web; use CLI for administration.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console."
+  ],
+  "commands": [
+    {
+      "cmd": "splunk help",
+      "explain": "Show installed CLI help.",
+      "verification": "official-docs"
+    },
+    {
+      "cmd": "splunk status",
+      "explain": "Check the local service explicitly; it does not start the service.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "splunk help",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.3/administer-splunk-enterprise-with-the-command-line-interface-cli/about-the-cli",
+  "install_link": "https://www.splunk.com/en_us/download.html"
+}

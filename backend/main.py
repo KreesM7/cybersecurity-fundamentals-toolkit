@@ -47,6 +47,8 @@ from backend.services.module_service import ModuleService
 from backend.services.payload_service import PayloadService
 from backend.services.report_service import ReportService
 from backend.services.rpc_transport import RpcFailure
+from backend.services.secdesk_findings import SecDeskFindings
+from backend.services.secdesk_service import SecDeskService
 from backend.services.tool_service import ToolService
 from backend.services.vault_service import VaultAccessError, VaultService
 from backend.services.workspace_service import (
@@ -117,6 +119,8 @@ def create_app(
             app.state.payloads = PayloadService(
                 app.state.modules, app.state.artifacts, jobs, app.state.mutations
             )
+            app.state.secdesk = SecDeskService(service, hub)
+            app.state.secdesk_findings = SecDeskFindings(service, hub)
             yield
         finally:
             if hasattr(app.state, "desktop"):
@@ -129,8 +133,12 @@ def create_app(
                 try:
                     try:
                         try:
-                            if hasattr(app.state, "activity"):
-                                await app.state.activity.close()
+                            try:
+                                if hasattr(app.state, "secdesk"):
+                                    await app.state.secdesk.close()
+                            finally:
+                                if hasattr(app.state, "activity"):
+                                    await app.state.activity.close()
                         finally:
                             await framework.close()
                     finally:

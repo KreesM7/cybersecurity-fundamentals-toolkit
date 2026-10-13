@@ -1,15 +1,24 @@
-# Source ledger
+# SecDesk sources
 
-Research date: 2026-10-13. Statements below are documented capabilities, not claims of installed or locally tested tools.
+Research date: 2026-10-13. These are documentation authorities, not assertions of local installation or native output. Each manifest's overview, interface flags and commands use its `docs_link`; successful/failed native examples stay explicitly unverified. No vendor output is invented.
 
-| Tool | Official source | Verified from source | Real tool run |
-| --- | --- | --- | --- |
-| Wireshark/TShark | https://www.wireshark.org/docs/man-pages/tshark.html and https://www.wireshark.org/docs/man-pages/wireshark | Packet inspection, saved-file reading, version option; GUI/terminal distinction | Unverified: executables absent in this Windows/Toolkit-MSF test environment |
-| Tcpdump | https://github.com/the-tcpdump-group/tcpdump/blob/master/tcpdump.1.in | CLI packet analysis; saved-file `-r`, numeric addresses `-n`, version option | Unverified: executable absent |
-| Aircrack-ng | https://www.aircrack-ng.org/doku.php?id=install_aircrack and https://aircrack-ng.org/doku.php?id=install_drivers | CLI suite and Windows adapter/driver limits; no integration delivered yet | Unverified |
-| Metasploit | https://docs.rapid7.com/metasploit/getting-started/ and https://help.rapid7.com/metasploit/Content/framework/about-msf.html | Framework console; existing Toolkit connection/console will be reused later | No SecDesk launch tested |
-| Nessus | https://docs.tenable.com/nessus/Content/NessusCLI.htm | Admin CLI with license-dependent help and administrator requirements | Commercial integration pending |
-| Nikto | https://github.com/sullo/nikto/wiki | Official documentation located; command research pending | Unverified |
-| Splunk | https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.3/administer-splunk-enterprise-with-the-command-line-interface-cli/about-the-cli | CLI administration documentation located; integration pending | Unverified |
+| Manifest / section | Official authority | Scope established |
+| --- | --- | --- |
+| `wireshark.json` | [Wireshark](https://www.wireshark.org/docs/man-pages/wireshark), [TShark](https://www.wireshark.org/docs/man-pages/tshark.html) | GUI/CLI distinction, saved captures and version option |
+| `tcpdump.json` | [Official manual source](https://github.com/the-tcpdump-group/tcpdump/blob/master/tcpdump.1.in) | CLI, numeric addresses, saved-file reading, version option |
+| `metasploit.json` | [Framework console documentation](https://github.com/rapid7/metasploit-framework/blob/master/documentation/cli/msfconsole.md) | Console interface and version/database commands; in-app page links refer to existing Toolkit code |
+| `aircrack-ng.json` | [Command documentation](https://www.aircrack-ng.org/doku.php?id=aircrack-ng), [Installation](https://www.aircrack-ng.org/doku.php?id=install_aircrack), [Drivers](https://aircrack-ng.org/doku.php?id=install_drivers) | CLI help and adapter/driver constraints |
+| `nikto.json` | [Official wiki](https://github.com/sullo/nikto/wiki), [Basic testing](https://github.com/sullo/nikto/wiki/Basic-Testing) | Perl CLI and web testing; no guessed command flags are enabled |
+| `nessus.json` | [Tenable Nessuscli](https://docs.tenable.com/nessus/Content/NessusCLI.htm) | Administrative CLI help, elevated privilege requirements and license dependence |
+| `splunk.json` | [Splunk CLI](https://help.splunk.com/en/splunk-enterprise/administer/admin-manual/9.3/administer-splunk-enterprise-with-the-command-line-interface-cli/about-the-cli) | CLI help/status and web/administration distinction |
+| `forcepoint.json` | [DLP Security Manager](https://help.forcepoint.com/dlp/10.3.0/fsmhelp/82FD991E-8604-40D9-909B-576F980C3859.html) | DLP administration through Security Manager; other Forcepoint products are unknown |
+| `nexpose.json` | [Rapid7 Security Console deployment](https://docs.rapid7.com/cloud-risk-complete/deploy-console/) | Console deployment and web administration |
+| `netstumbler.json` | [Official 0.4.0 release notes](https://downloads.netstumbler.com/downloads/netstumbler_v0.4.0_release_notes.pdf), [Microsoft netsh](https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-wlan) | Legacy requirements; modern NetStumbler compatibility unknown; netsh is an advisory substitute, not an added integration |
+| Burp guide | [Proxy](https://portswigger.net/burp/documentation/desktop/tools/proxy), [External browser configuration](https://portswigger.net/burp/documentation/desktop/external-browser-config) | Proxy/Intercept/Repeater education; no proxy or CA installation, automation or verified edition |
+| Companion guide | [pySerial port metadata](https://pyserial.readthedocs.io/en/latest/tools.html#serial-tools-list-ports), [Serial API](https://pyserial.readthedocs.io/en/latest/pyserial_api.html) | Serial API only; device capabilities/protocol unknown |
+| Windows terminal | [pywinpty API/source](https://github.com/andfoy/pywinpty/blob/main/winpty/ptyprocess.py), [Pinned package](https://pypi.org/project/pywinpty/3.0.5/) | ConPTY API. Real Windows fixtures verify input, resize and owned cleanup. Observed ConPTY writes return zero on success, so its exception contract is used rather than treating zero as a partial byte count |
+| POSIX terminal | [util-linux script](https://raw.githubusercontent.com/util-linux/util-linux/master/term-utils/script.1.adoc), [Apple script source manual](https://raw.githubusercontent.com/apple-oss-distributions/shell_cmds/main/script/script.1) | PTY helper command syntax. Linux fixtures pass; macOS runtime remains unverified |
+| VT interpretation | [pyte API](https://pyte.readthedocs.io/en/latest/api.html) | Monochrome screen interpretation; this is not a claim of full xterm compatibility |
+| Windows GUI ownership | [Job Objects](https://learn.microsoft.com/en-us/windows/win32/procthread/job-objects), [Thread enumeration](https://learn.microsoft.com/en-us/windows/win32/toolhelp/traversing-the-thread-list) | Job assignment before resume, inherited descendant accounting and bounded cleanup; controlled Python fixtures verify launcher exit and child cleanup |
 
-Forcepoint, Nexpose/InsightVM, NetStumbler, Burp and community gap research remain pending. No readiness, compatibility, licensing or output is asserted for them. Native success/failure examples are explicitly unverified; no fake sample output is stored. Installed/absent doctor tests simulate discovery only and do not establish native tool behavior.
+Controlled fixtures launch Python or the OS shell without security targets. Those fixtures establish launcher/PTY mechanics, consent, isolation, redaction and cleanup, not Wireshark, Nessus or other vendor behavior. Vendor success/failure captures, license verification, actual monitor/capture permissions and service health require the corresponding installed deployment.

@@ -19,6 +19,7 @@ from shared.modules import (
     ModuleSearch,
 )
 from shared.schemas import SchemaModel
+from shared.secdesk import FindingImportResult, FindingSource
 from shared.workspaces import TargetTransfer, TargetView, WorkspaceView
 
 
@@ -123,6 +124,14 @@ class AppViewModel(ToolsViewModel):
                     "vault",
                     "artifacts",
                     "dashboard",
+                    "secdesk-session",
+                    "secdesk-launch",
+                    "secdesk-input",
+                    "secdesk-close",
+                    "secdesk-resize",
+                    "secdesk-audit",
+                    "secdesk-console",
+                    "secdesk-findings",
                 )
             )
             and scope != self.workspace_id
@@ -244,3 +253,10 @@ class AppViewModel(ToolsViewModel):
             f"/api/v1/targets/{identifier}/use-as-rhosts?workspace_id={self.workspace_id}",
             TargetTransfer,
         )
+
+    def upload_findings(self, source: FindingSource, filename: str) -> None:
+        identifier = self.run_upload(
+            "/api/v1/secdesk/findings/upload", FindingImportResult, source, filename
+        )
+        self._actions[identifier] = "secdesk-findings-import"
+        self._action_scopes[identifier] = source.workspace_id

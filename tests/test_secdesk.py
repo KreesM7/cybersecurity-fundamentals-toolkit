@@ -7,7 +7,8 @@ def test_registry_and_json_schema():
     import jsonschema
 
     tools = load_registry()
-    assert {tool.id for tool in tools} == {"wireshark", "tcpdump"}
+    assert len(tools) == 10
+    assert {"wireshark", "tcpdump", "metasploit", "forcepoint"} <= {tool.id for tool in tools}
     for tool in tools:
         jsonschema.validate(tool.model_dump(mode="json"), ToolManifest.model_json_schema())
     with pytest.raises(ValueError):
@@ -56,13 +57,13 @@ async def test_authenticated_passive_doctor_endpoint(tmp_path, monkeypatch):
                 "/api/v1/secdesk/doctor", headers={"Authorization": "Bearer " + "a" * 64}
             )
             assert response.status_code == 200
-            assert len(response.json()) == 2
+            assert len(response.json()) == 10
             assert all(row["version"] == "unknown" for row in response.json())
 
 
 def test_registry_is_independent_of_working_directory(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    assert len(load_registry()) == 2
+    assert len(load_registry()) == 10
 
 
 def test_gui_details_missing_badges_and_manifest_failure(monkeypatch):

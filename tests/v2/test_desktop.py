@@ -14,7 +14,7 @@ from shared.desktop import DesktopSettings, UpdateNotice
 
 
 @pytest.mark.parametrize(
-    "value", ["2.2.0-beta", "v02.2.0", "9999999.1.0", "2.0", "file:///etc/passwd"]
+    "value", ["2.3.0-beta", "v02.3.0", "9999999.1.0", "2.0", "file:///etc/passwd"]
 )
 def test_stable_versions_only(value):
     assert stable_version(value) is None
@@ -35,7 +35,7 @@ async def test_update_bounds_etag_persistence_dismiss_and_quiet_failures(tmp_pat
             200,
             headers={"ETag": '"fixture"'},
             json={
-                "tag_name": "v2.2.0",
+                "tag_name": "v2.3.0",
                 "draft": False,
                 "prerelease": False,
                 "html_url": "https://untrusted.invalid/",
@@ -43,10 +43,10 @@ async def test_update_bounds_etag_persistence_dismiss_and_quiet_failures(tmp_pat
         )
 
     await service.check(httpx.MockTransport(fixture))
-    assert service.visible_notice().url == RELEASE_PAGE + "v2.2.0"
+    assert service.visible_notice().url == RELEASE_PAGE + "v2.3.0"
     await service.check(httpx.MockTransport(fixture))
     assert requests[-1].headers["If-None-Match"] == '"fixture"'
-    service.settings.dismissed_version = "v2.2.0"
+    service.settings.dismissed_version = "v2.3.0"
     assert not service.visible_notice().version
     await service.update(
         service.settings.model_copy(update={"check_updates": False, "theme": "light"})
@@ -62,14 +62,14 @@ async def test_update_bounds_etag_persistence_dismiss_and_quiet_failures(tmp_pat
                 lambda _: httpx.Response(status, headers={"Location": "http://127.0.0.1"})
             )
         )
-        assert restored.notice.version == "v2.2.0"
+        assert restored.notice.version == "v2.3.0"
     for result in (
         {"tag_name": "3.0.0-beta", "draft": False, "prerelease": False},
         ["wrong"],
         {"body": "a" * 65537},
     ):
         await restored.check(httpx.MockTransport(lambda _: httpx.Response(200, json=result)))
-        assert restored.notice.version == "v2.2.0"
+        assert restored.notice.version == "v2.3.0"
 
     def offline(request):
         raise httpx.ConnectError("offline")
@@ -91,7 +91,7 @@ def test_desktop_preferences_onboarding_and_banner():
     assert panel.settings.theme == "light"
     panel.finish_onboarding()
     assert panel.settings.onboarding_complete
-    panel.update_state("updates", UpdateNotice(version="v2.2.0", url=RELEASE_PAGE + "v2.2.0"))
+    panel.update_state("updates", UpdateNotice(version="v2.3.0", url=RELEASE_PAGE + "v2.3.0"))
     assert not panel.banner.isHidden()
     panel.dismiss_update()
     assert panel.banner.isHidden()

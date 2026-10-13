@@ -1,0 +1,17 @@
+[
+  {
+    "id": "burp",
+    "title": "Burp Suite",
+    "docs_link": "https://portswigger.net/burp/documentation/desktop/tools/proxy",
+    "install_link": "https://portswigger.net/burp/releases",
+    "text": "1. Overview\nBurp is a GUI tool for inspecting and editing web traffic. Use Proxy for requests, Repeater for manual experiments, and licensed Pro features where available. This is an educational section, not an automation target.\n\n2. Setup\nLicense: Not detected. Community/Pro detection is unknown. Use Burp's built-in browser, or follow the vendor's external-browser proxy and CA-certificate instructions. SecDesk never changes system proxies or installs a CA.\n\n3. Workflow cheatsheet\nProxy: inspect authorized traffic. Intercept: pause an individual request. Repeater: edit and resend it manually. Intruder/Scanner capabilities depend on the installed edition and license. Set the target scope in Burp before testing.\n\n4. Successful example\nUnverified: no native run or output has been captured. Follow the vendor's getting-started labs; no result is invented here.\n\n5. Failed example\nUnverified: no native failure output has been captured.\n\n6. Error dictionary\nNative patterns remain unverified. Consult vendor proxy-listener, browser-configuration and certificate troubleshooting. Do not disable TLS verification as a workaround.\n\n7. Launch\nUse the installed vendor application. Native shortcut and optional Pro REST integration require installation/license verification; they are not enabled here. This section does not run scans.\nSource: https://portswigger.net/burp/documentation/desktop/tools/proxy\nExternal browser: https://portswigger.net/burp/documentation/desktop/external-browser-config\n"
+  },
+  {
+    "id": "companion",
+    "title": "Device companion",
+    "detect_usb": true,
+    "docs_link": "https://pyserial.readthedocs.io/en/latest/tools.html#serial-tools-list-ports",
+    "install_link": "https://pyserial.readthedocs.io/en/latest/pyserial_api.html",
+    "text": "1. Overview\nPC-side USB-serial companion for your DIY device. No firmware capabilities are assumed.\n\n2. Setup\nFirmware command protocol, USB vendor/product IDs, baud rate and framing are required. They have not been supplied. Local port discovery does not open a connection or identify any port as your device.\n\n3. Requested features\nSub-GHz capture/replay; 125 kHz RFID read; NFC read/emulate; infrared capture/replay; BadUSB upload; GPIO. All device actions remain disabled until the real protocol and capability set are supplied.\n\n4. Successful example\nUnverified: no matching device, adapter or capture output is available.\n\n5. Failed example\nFirmware protocol and USB IDs required; device actions disabled. This is SecDesk's local guard, not fabricated device output.\n\n6. Error dictionary\nAdapter missing: supply the firmware specification. Device mismatch: select a port matching the supplied VID/PID. Incomplete write: outcome is unknown; no command is repeated. Native firmware error patterns are unknown.\n\n7. Connection\nCheck USB ports reads local metadata only. The pluggable FirmwareAdapter and CompanionTransport require explicit authorization for every supported operation. No transmit, replay, emulation, BadUSB or GPIO command is guessed or sent.\nSource: https://pyserial.readthedocs.io/en/latest/tools.html#serial-tools-list-ports\n"
+  }
+]

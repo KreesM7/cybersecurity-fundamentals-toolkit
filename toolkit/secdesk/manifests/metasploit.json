@@ -1,0 +1,68 @@
+{
+  "id": "metasploit",
+  "name": "Metasploit Framework",
+  "category": "penetration-testing",
+  "one_liner": "Use framework modules through msfconsole and the existing authenticated Metasploit connection.",
+  "has_gui": false,
+  "native_gui": false,
+  "console": false,
+  "embedded_pages": ["Settings", "Modules", "Sessions & Jobs", "Payloads"],
+  "has_terminal": true,
+  "terminal_recommended": true,
+  "terminal_binary": "msfconsole",
+  "detect": {
+    "binary": "msfconsole",
+    "version_flag": ""
+  },
+  "required_services": [
+    "PostgreSQL for database features"
+  ],
+  "required_permissions": [
+    "Written authorization for each target"
+  ],
+  "license": null,
+  "overview": "Use framework modules through msfconsole and the existing authenticated Metasploit connection.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "The existing Toolkit-MSF connection and terminal are available in Settings and Sessions & Jobs. Native PATH discovery does not verify the WSL installation.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console."
+  ],
+  "commands": [
+    {
+      "cmd": "msfconsole",
+      "explain": "Start the framework console.",
+      "verification": "official-docs"
+    },
+    {
+      "cmd": "version",
+      "explain": "Inside msfconsole: show framework and console versions.",
+      "verification": "official-docs"
+    },
+    {
+      "cmd": "db_status",
+      "explain": "Inside msfconsole: inspect database connectivity.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "msfconsole",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://github.com/rapid7/metasploit-framework/blob/master/documentation/cli/msfconsole.md",
+  "install_link": "https://docs.rapid7.com/metasploit/installing-the-metasploit-framework/"
+}

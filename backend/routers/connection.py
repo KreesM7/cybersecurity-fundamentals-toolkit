@@ -55,7 +55,9 @@ async def disconnect(
 
 @router.get("/shutdown-check")
 async def shutdown_check(request: Request) -> dict[str, bool]:
-    return {"confirmation_required": await service(request).shutdown_check()}
+    native = getattr(request.app.state, "secdesk", None)
+    native_active = bool(native and any(not item.released for item in native.owned.values()))
+    return {"confirmation_required": native_active or await service(request).shutdown_check()}
 
 
 @router.post("/fallback", response_model=ConnectionStatus)

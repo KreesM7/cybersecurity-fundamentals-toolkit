@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "cybersecurity-fundamentals-toolkit"
-version = "2.1.0"
+version = "2.2.0"
 description = "Local desktop cybersecurity fundamentals toolkit"
 requires-python = ">=3.11,<3.13"
 license = "MIT"
@@ -29,6 +29,9 @@ dependencies = [
   "python-multipart==0.0.32",
   "python-nmap==0.7.1",
   "psutil==7.2.2",
+  "pywinpty==3.0.5; sys_platform == 'win32'",
+  "pyte==0.8.2",
+  "pyserial==3.5",
   "python-magic==0.4.27",
   "zxcvbn==4.5.0",
   "urllib3==2.8.0",
@@ -41,7 +44,7 @@ pdf = ["weasyprint==70.0"]
 build = ["PyInstaller==6.22.3"]
 dev = [
   "pytest==9.1.1", "pytest-asyncio==1.4.0", "pytest-cov==7.1.0",
-  "black==26.10.0", "ruff==0.16.10", "mypy==2.4.0", "jsonschema==4.26.0",
+  "black==26.10.0", "ruff==0.16.10", "mypy==2.4.0", "jsonschema==4.26.0", "types-psutil==7.2.2.20260906",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,7 +54,7 @@ include = ["backend*", "frontend*", "shared*", "toolkit*"]
 backend = ["resources/*.ps1"]
 frontend = ["resources/themes/*.qss", "resources/icons/*", "resources/examples/*"]
 "toolkit.resources" = ["*.txt"]
-"toolkit.secdesk" = ["registry.json", "manifests/*.json"]
+"toolkit.secdesk" = ["registry.json", "guides.json", "manifests/*.json"]
 
 [tool.black]
 line-length = 100

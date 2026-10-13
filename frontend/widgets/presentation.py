@@ -245,7 +245,9 @@ class StatusBadge(QLabel):
         super().paintEvent(event)
         painter = QPainter(self)
         state = str(self.property("state"))
-        icon = "ready" if state == "done" else "failed" if state == "cancelled" else state
+        icon = {"done": "ready", "cancelled": "failed", "unknown": "help", "idle": "help"}.get(
+            state, state
+        )
         line_icon(icon).paint(
             painter, SPACE["xs"], (self.height() - SIZE["icon"]) // 2, SIZE["icon"], SIZE["icon"]
         )
@@ -253,7 +255,7 @@ class StatusBadge(QLabel):
 
     def set_status(self, text: str, state: str) -> None:
         """Use the existing badge appearance with an explicit readiness state."""
-        if state not in {"ready", "running", "done", "failed", "cancelled"}:
+        if state not in {"ready", "running", "done", "failed", "cancelled", "unknown", "idle"}:
             raise ValueError("Unknown badge state")
         self.setText(text)
         self.setProperty("state", state)

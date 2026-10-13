@@ -1,0 +1,49 @@
+{
+  "id": "netstumbler",
+  "name": "NetStumbler",
+  "category": "wireless-discovery",
+  "one_liner": "Legacy Windows wireless discovery; modern OS and driver support is unknown.",
+  "has_gui": true,
+  "native_gui": true,
+  "console": false,
+  "has_terminal": false,
+  "terminal_recommended": false,
+  "terminal_binary": null,
+  "detect": {
+    "binary": "NetStumbler",
+    "version_flag": ""
+  },
+  "required_services": [],
+  "required_permissions": [
+    "Compatible legacy adapter and driver; current Windows support unverified"
+  ],
+  "license": null,
+  "overview": "Legacy Windows wireless discovery; modern OS and driver support is unknown.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console.",
+    "Legacy 0.4.0 release notes describe Windows 2000/XP-era support. Current Windows compatibility is unknown. Suggested substitute: Windows netsh wlan show interfaces; see Microsoft documentation. It is advisory, not a managed replacement. https://learn.microsoft.com/en-us/windows-server/administration/windows-commands/netsh-wlan"
+  ],
+  "commands": [],
+  "example_success": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://downloads.netstumbler.com/downloads/netstumbler_v0.4.0_release_notes.pdf",
+  "install_link": "https://www.netstumbler.com/downloads/"
+}

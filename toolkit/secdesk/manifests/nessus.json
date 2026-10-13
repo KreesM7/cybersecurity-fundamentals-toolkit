@@ -1,0 +1,57 @@
+{
+  "id": "nessus",
+  "name": "Nessus Pro",
+  "category": "vulnerability-scanning",
+  "one_liner": "Use the vendor web console for licensed vulnerability scans.",
+  "has_gui": true,
+  "native_gui": false,
+  "console": true,
+  "has_terminal": false,
+  "terminal_recommended": false,
+  "terminal_binary": null,
+  "detect": {
+    "binary": "nessuscli",
+    "version_flag": "",
+    "windows_program_files_path": "Tenable/Nessus/nessuscli.exe"
+  },
+  "required_services": [
+    "Nessus service"
+  ],
+  "required_permissions": [
+    "Vendor license and authorized scan scope"
+  ],
+  "license": "commercial",
+  "overview": "Use the vendor web console for licensed vulnerability scans.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console."
+  ],
+  "commands": [
+    {
+      "cmd": "nessuscli help",
+      "explain": "Administrative CLI help; scanning remains in the web console.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "nessuscli help",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://docs.tenable.com/nessus/Content/NessusCLI.htm",
+  "install_link": "https://www.tenable.com/downloads/nessus"
+}

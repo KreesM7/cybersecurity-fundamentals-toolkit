@@ -125,7 +125,9 @@ class MainWindow(QMainWindow):
             self.register_view("Artifacts", ArtifactsPanel(view_model))
             self.register_view("Vault", VaultPanel(view_model))
             self.register_view("Reports", ReportsPanel(view_model))
-            self.register_view("SecDesk", SecDeskPanel(view_model))
+            secdesk_panel = SecDeskPanel(view_model)
+            secdesk_panel.navigate_requested.connect(self.navigate_title)
+            self.register_view("SecDesk", secdesk_panel)
             self.register_view("Settings", desktop_controls.settings_panel)
             for keys, callback in (
                 ("Ctrl+K", self.command_palette),
@@ -294,8 +296,8 @@ class MainWindow(QMainWindow):
             QMessageBox.question(
                 self,
                 "Stop owned activity?",
-                "Closing will stop active or uncertain sessions and jobs in the app's "
-                "owned Metasploit console. Close now?",
+                "Closing stops owned Metasploit activity and SecDesk native sessions. "
+                "Save captures and tool documents first. Close now?",
                 QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No,
                 QMessageBox.StandardButton.No,
             )

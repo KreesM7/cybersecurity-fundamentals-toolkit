@@ -28,7 +28,7 @@ async def test_health_returns_instance_and_protects_docs(tmp_path: Path) -> None
         response = await client.get("/api/v1/health", headers={"Authorization": f"Bearer {TOKEN}"})
         assert response.json() == {
             "schema_version": 1,
-            "version": "2.1.0",
+            "version": "2.2.0",
             "instance_id": "test-instance",
             "status": "ready",
         }
@@ -380,7 +380,7 @@ def test_qt_worker_keeps_ui_responsive_delivers_on_gui_and_shuts_down(tmp_path: 
     @service.get("/api/v1/health")
     async def slow_health() -> dict[str, str | int]:
         await asyncio.sleep(0.2)
-        return {"schema_version": 1, "version": "2.1.0", "instance_id": "live", "status": "ready"}
+        return {"schema_version": 1, "version": "2.2.0", "instance_id": "live", "status": "ready"}
 
     vm = BaseViewModel(
         API_URL,
@@ -436,7 +436,7 @@ def test_qt_mutation_creates_one_id_and_delivers_result_on_gui_thread() -> None:
     @service.post("/api/v1/action")
     async def action(request: Request) -> dict[str, str | int]:
         mutation_ids.append(request.headers.get("X-Request-ID"))
-        return {"schema_version": 1, "version": "2.1.0", "instance_id": "action", "status": "ready"}
+        return {"schema_version": 1, "version": "2.2.0", "instance_id": "action", "status": "ready"}
 
     vm = BaseViewModel(
         API_URL,

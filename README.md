@@ -192,6 +192,9 @@ See [LowREA status](docs/lowrea/STATUS.md) and [integration design](docs/lowrea/
 The published v2.1.0 installers do not include LowREA.
 
 
-## SecDesk (initial source integration)
+## SecDesk source integration
 
-Open **SecDesk** in the sidebar for Wireshark/Tcpdump documentation and passive installation checks. Native launching, embedded terminals and the remaining tools are not delivered yet. See [SecDesk status](docs/secdesk/STATUS.md), [sources](docs/secdesk/SOURCES.md) and [development resource rules](docs/DEV_WORKFLOW.md).
+Open **SecDesk** in the sidebar for ten tool detail views, passive installation checks and explicit native/console launch controls. See [SecDesk status](docs/secdesk/STATUS.md), [sources](docs/secdesk/SOURCES.md) and [development resource rules](docs/DEV_WORKFLOW.md).
+
+
+The 2.2.0 source candidate expands SecDesk to ten vendor-sourced tool manifests, explicit native terminals/GUI launches, linked commercial consoles, Burp/device guides and workspace findings. Use `python -m toolkit --profile work/secdesk-dev` while developing and `python -m toolkit secdesk doctor` for passive discovery. Tools are never silently installed or started. Native licensing/compatibility and firmware operations remain unverified where the required deployment/specification is unavailable; see [delivery status](docs/secdesk/STATUS.md). Published 2.1.0 installers do not contain these source changes.

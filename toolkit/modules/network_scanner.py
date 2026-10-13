@@ -36,7 +36,7 @@ class HostResult:
 
 
 def list_interfaces() -> list[NetworkInterface]:
-    import psutil  # type: ignore[import-untyped]
+    import psutil
 
     stats = psutil.net_if_stats()
     interfaces = []

@@ -1,0 +1,56 @@
+{
+  "id": "aircrack-ng",
+  "name": "Aircrack-ng",
+  "category": "wifi-security",
+  "one_liner": "Inspect Wi-Fi captures and test wireless security with the native CLI suite.",
+  "has_gui": false,
+  "native_gui": false,
+  "console": false,
+  "has_terminal": true,
+  "terminal_recommended": true,
+  "terminal_binary": "aircrack-ng",
+  "detect": {
+    "binary": "aircrack-ng",
+    "version_flag": ""
+  },
+  "required_services": [],
+  "required_permissions": [
+    "Supported adapter, driver and monitor mode for capture",
+    "Written authorization before radio testing"
+  ],
+  "license": null,
+  "overview": "Inspect Wi-Fi captures and test wireless security with the native CLI suite.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console.",
+    "Windows capture capabilities depend on supported drivers/adapters; native compatibility is unverified. Consult the vendor driver guide before choosing an adapter."
+  ],
+  "commands": [
+    {
+      "cmd": "aircrack-ng -H",
+      "explain": "Display documented command help; no capture or transmission starts.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "aircrack-ng -H",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://www.aircrack-ng.org/doku.php?id=aircrack-ng",
+  "install_link": "https://www.aircrack-ng.org/doku.php?id=install_aircrack"
+}

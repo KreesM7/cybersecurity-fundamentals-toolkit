@@ -1,13 +1,31 @@
 # SecDesk delivery status
 
-Implemented initial foundation: strict manifests and JSON-schema tests; two tools (Wireshark/Tcpdump); authenticated passive doctor; a manifest-driven tool grid and seven-section detail view; vendor links; explicit unknown readiness, versions and examples; existing semantic status badges and keyboard labels. Missing/corrupt manifests are isolated from desktop startup. No processes, services, captures or network endpoints are started by doctor.
+Source candidate: 2.2.0. Published installers remain 2.1.0; this work does not silently replace or publish them. LowREA remains a separate unfinished integration.
 
-Stack decision: reuse the established Python 3.12/PyQt6/FastAPI application rather than introduce Tauri. It already has tested Windows packaging, authenticated services, workspaces, Argon2id vault, reports and a dedicated Metasploit PTY. A second runtime would duplicate resource ownership, credentials and release signing. The embedded terminal and managed launch work are still pending, not simulated.
+Implemented: ten strict manifests; bundled educational guides; JSON-schema validation; passive local doctor and a visible startup checklist; manifest-driven cards and seven-section details; existing Metasploit page links; explicit ownership acknowledgment; four owned native sessions with workspace leases; Windows ConPTY and Linux OS PTY helper; input/resize/stop, bounded screen output, redacted readiness failures; durable UTC launch acknowledgments; explicit HTTPS web-console navigation; USB-serial metadata and a pluggable firmware transport; redacted, deduplicated workspace findings imports and existing HTML/PDF report summaries; keyboard labels, tooltips and terminal focus isolation. Native processes never follow startup checks automatically.
 
-Known limits: neither initial native tool is installed on the test host. Version/service/permission/license validation stays unknown. No live capture was performed. No real success/failure output or native error pattern is invented. The firmware protocol and USB identities have not been supplied; user agreed to keep device actions disabled.
+## Milestone record
 
-Remaining milestones: M0 managed-process supervision; M1 generic terminal plus Metasploit/Aircrack/Nikto; M2 four commercial consoles/licensing; M3 NetStumbler compatibility and all-tool startup checklist; M4 Burp and protocol-backed companion; M5 real gap research and user selection; M6 findings, exports, accessibility/motion and full verification.
+| Milestone | Verified implementation | Unverified / known limits | Next |
+| --- | --- | --- | --- |
+| M0 | Manifest contracts, passive discovery, missing-resource isolation, authenticated API and owned supervision | Native vendor installations are not established by controlled fixtures | Verify on configured tool deployments |
+| M1 | Tool grid/details and real Windows/Linux terminal input, resize, normal exit and cancellation | Terminal is a monochrome VT viewport, without scrollback, mouse integration or guaranteed full xterm behavior; macOS runtime unverified | Native CLI workflow captures |
+| M2 | Four commercial tools have linked HTTPS consoles and visible Not detected license badges; requests are acknowledged locally | No license API, service health or remote management is claimed; credentials stay in the existing vault/vendor login flow | Deployment-specific service/license adapters |
+| M3 | Legacy NetStumbler guidance, advisory netsh substitute and local checklist | Modern NetStumbler compatibility unknown; no adapter/capture permissions inferred from executable presence | Test a compatible host/adapter |
+| M4 | Burp education; passive serial metadata; real transport adapter interface with bounded writes/reads and fail-closed authorization | No Burp edition/native shortcut verified; firmware protocol, VID/PID and capabilities not supplied; all device actions disabled, as agreed | Supply firmware specification and matching device |
+| M5 | Primary/vendor research and documented community/competitor gap review | Research samples are not representative demand | User selected keeping current scope; no extras added |
+| M6 | Existing workspace/vault/report infrastructure reused; local audit; explicit findings import, deduplication/redaction and report summaries; keyboard navigation | Raw vendor outputs are not guessed into findings; only normalized JSON/CSV supported. No custom animation is used, so reduced-motion users receive static transitions | Native/deployment verification and vendor-specific import formats |
 
-This is source development, not a new published installer. LowREA remains a separate incomplete integration.
+Rulings: reuse PyQt6/FastAPI instead of Tauri because existing tested packaging, auth, vault, workspaces and Metasploit ownership should not be duplicated. Cost: no new web/xterm shell. Startup remains passive to honor explicit visible action and no silent target operations. Cost: versions/services/permissions/licenses remain unknown until checked in the native tool or vendor console. Normalize only explicit records rather than infer vulnerabilities from terminal text. Cost: vendor exports may need conversion. Firmware actions remain disabled until the real protocol is supplied; no wire command is guessed.
 
-Verification (2026-10-13): full pytest suite 403 passed, 8 skipped and 50 subtests passed; coverage 81.41%. Black/Ruff and strict mypy pass. Windows PyInstaller build passed; frozen authenticated startup from a different working directory opened all 18 panels. Independent review passed after required registry-resource validation was fixed. Both schema and discovery tests reject empty/partial registries. Screenshots were inspected using the shared dark theme. This verifies app integration and packaging, not unavailable native tool behavior.
+## Verification (2026-10-13)
+
+- Windows: `python -m pytest --cov --cov-report=xml --cov-report=term -v` — 425 passed, 8 skipped, 50 subtests passed; 80.60% coverage (75% gate preserved). One existing Starlette/httpx test-client deprecation warning; no new lint/type warnings.
+- Linux (dedicated Toolkit-MSF test environment): SecDesk registry, native terminal and workflow suites — 30 passed. Controlled Python/shell fixtures only; no security targets or captures.
+- Black check (221 files), Ruff, strict mypy (148 source files) for Windows and Linux, and `uv lock --check` — passed.
+- Windows `PyInstaller toolkit.spec` — passed. Source and frozen `--self-test` — 18 panels and all ten manifests loaded; frozen run used a different working directory and a disposable profile.
+- Build inventory — 67 actual bundled Windows distributions recorded in local candidate evidence; original published 2.1.0 inventories remain unchanged.
+- Independent read-only runtime review — three ownership/session race findings fixed. Reviewer independently ran 22 focused tests, including GUI descendants after parent exit and monitor cancellation before start; no remaining actionable blocker in those fixes.
+- Real Qt screenshots inspected for grid/details, semantic license/idle badges and documentation/launch layout. No decorative image assets added.
+
+Release and deployment limits remain as listed above. No 2.2.0 installer was published, no vendor deployment/license was verified, and no firmware command was sent. Production profiles/vaults were not migrated in these checks.

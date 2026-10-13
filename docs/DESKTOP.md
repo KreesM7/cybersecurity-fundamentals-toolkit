@@ -69,3 +69,20 @@ in scope: those targets have no single silent-install convention or install loca
 Tests use a mocked GitHub API plus harmless fixture executables. Windows tests run
 the actual handoff script and verify silent arguments, Unicode paths, relaunch and
 refusal on checksum/signature failures. They never run a downloaded installer.
+
+
+## SecDesk source candidate (2.2.0)
+
+Open SecDesk from the Tools navigation. Startup checks are passive and local: executable presence, dependency discovery and serial metadata. They do not start services, open serial connections, run captures or probe endpoints. Unknown services/permissions/licenses are displayed with Setup guidance. Recheck repeats only those passive checks.
+
+Open a tool detail view, read Setup, acknowledge ownership, then launch its native GUI or terminal. A terminal starts the OS shell with the selected tool directory on PATH and a private workspace working directory; no scan command is prefilled or executed. Metasploit's existing Settings, Modules, Sessions & Jobs and Payloads pages are linked from its manifest. Native discovery does not inspect WSL installations. For commercial tools, enter a credential-free HTTPS console URL, acknowledge ownership and open it explicitly; no license bypass or TLS disablement is provided. A local console-request record means navigation was requested, not that vendor health/licensing was verified.
+
+Four native sessions are allowed. Stop/close and app shutdown reap owned processes and release workspace leases; failed cleanup preserves ownership for retry. Save native captures/documents before closing. POSIX terminals require the host `/usr/bin/script`; no helper is auto-installed and transcripts go to `/dev/null`. Windows uses locked pywinpty ConPTY. Shell history is disabled for the owned session, but external tools can persist data according to their own configuration. Input is limited to 4096 characters per frame and output to 64 KiB per read; the redacted viewport is bounded. Ctrl+Tab/Shift+Tab leave the terminal; other terminal control keys take precedence over app shortcuts. Mutation bookkeeping retains the existing 10,000-request instance cap; reconcile sessions before restarting if reached. No unknown input outcome is automatically repeated.
+
+Windows GUI launches enter a non-breakaway Job Object before their suspended parent resumes; child ownership survives a launcher exiting. Linux GUI launches own a process session. Processes that deliberately create a new POSIX session or hand work to an existing external service can escape that session; those detached services are not managed or killed. Avoid daemonizing commands in an owned terminal. Existing independent applications/services are never adopted merely because a launcher contacts them. macOS process cleanup remains unverified.
+
+Workspace findings accepts a JSON array of `{"title":"Observation","severity":"info","target":"127.0.0.1","evidence":"Your observed evidence"}` or UTF-8 CSV with exact columns `title,severity,target,evidence`. This is a format illustration, not a tool finding. Severity is one of info/low/medium/high/critical. Limits: 5 MiB, 1000 records per import, 500 displayed/report records; excess rows are not silently parsed. Same source/title/target merges, with latest supplied severity/evidence. Secrets are redacted before persistence. Default Reports includes finding summaries and excludes native terminal output/evidence. Original tool exports are not automatically interpreted.
+
+Use `python -m toolkit secdesk doctor` for local CLI discovery. For source development, use `python -m toolkit --profile work/secdesk-dev`; keep the installed release/profile separate. The new workspace schema adds audit/findings tables transactionally. Back up profiles before promoting a new installer; older binaries do not understand newer Alembic revisions. No production vault was used for this development test run.
+
+[SOURCES](secdesk/SOURCES.md), [STATUS](secdesk/STATUS.md), [GAPS](GAPS.md) and [DEV_WORKFLOW](DEV_WORKFLOW.md) record provenance, limits and resource ownership.

@@ -32,3 +32,6 @@ request, under the Apache-2.0 license; it is not vendored into the Python enviro
 The executable is SHA-256 pinned, checked before use, and used only to verify release
 bundles. Official source/license: https://github.com/sigstore/cosign/tree/v3.1.3 .
 Checksum source: https://github.com/sigstore/cosign/releases/download/v3.1.3/cosign_checksums.txt .
+
+
+SecDesk adds pywinpty 3.0.5 (MIT), pyserial 3.5 (BSD), and pyte 0.8.2 (LGPL-3.0); exact upstream license/source files must be included in each release inventory. The host POSIX `script` executable and vendor security tools are detected/used externally and are not bundled. Our added source remains MIT. New binary distribution requires refreshed inventory/notices and the existing dependency-license release gate; source verification alone does not establish binary redistribution clearance. The existing external Scapy/GPL-2.0-only and python-nmap/GPL-3.0 concerns remain documented.

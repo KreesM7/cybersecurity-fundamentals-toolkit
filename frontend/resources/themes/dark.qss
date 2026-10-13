@@ -23,6 +23,8 @@ QProgressBar[state="done"]::chunk { background: @success; }
 QLabel[state="failed"], QLabel[role="validation"] { color: @danger; }
 QLabel[state="ready"], QLabel[state="done"] { color: @success; }
 QLabel[state="running"] { color: @warning; }
+QLabel[state="unknown"] { color: @warning; }
+QLabel[state="idle"] { color: @muted; }
 QToolTip { background: @surface; color: @foreground; border: @linepx solid @border; padding: @smpx; }
 QSplitter::handle { background: @border; }
 

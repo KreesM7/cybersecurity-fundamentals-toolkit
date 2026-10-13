@@ -18,7 +18,7 @@ from backend.services import update_service as updates
 from backend.services.desktop_service import DesktopService
 from shared.desktop import UpdateProgress
 
-VERSION = "v2.2.0"
+VERSION = "v2.3.0"
 PAYLOAD = b"fake installer fixture"
 VERIFIER = b"fake verifier fixture"
 
@@ -281,8 +281,8 @@ async def test_handoff_requires_both_checks_and_correct_flags(tmp_path, verifier
         value.directory / "updated.json",
         json.dumps({"version": VERSION, "complete": True}).encode(),
     )
-    assert handoff.consume_update_message(tmp_path, "2.2.0") == "Updated to v2.2.0"
-    assert handoff.consume_update_message(tmp_path, "2.2.0") == ""
+    assert handoff.consume_update_message(tmp_path, "2.3.0") == "Updated to v2.3.0"
+    assert handoff.consume_update_message(tmp_path, "2.3.0") == ""
 
 
 @pytest.mark.parametrize("error", [subprocess.TimeoutExpired("cosign", 60), OSError("unavailable")])

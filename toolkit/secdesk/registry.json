@@ -1,6 +1,14 @@
 {
   "required_ids": [
     "wireshark",
-    "tcpdump"
+    "tcpdump",
+    "metasploit",
+    "aircrack-ng",
+    "nikto",
+    "nessus",
+    "splunk",
+    "forcepoint",
+    "nexpose",
+    "netstumbler"
   ]
 }

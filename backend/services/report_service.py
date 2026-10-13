@@ -9,7 +9,7 @@ from jinja2 import Environment, StrictUndefined
 from sqlalchemy import select
 
 from backend.jobs import JobContext, JobManager, JobSnapshot
-from backend.models import JobAssociation, Notes, RemoteSession, Report, Target
+from backend.models import JobAssociation, Notes, RemoteSession, Report, SecDeskFinding, Target
 from backend.mutations import MutationCoordinator
 from backend.services.artifact_service import ArtifactService
 from backend.services.workspace_service import WorkspaceService
@@ -103,6 +103,23 @@ class ReportService:
                             [
                                 [clean(row.tool_id), row.status, str(row.created_at)]
                                 for row in self.jobs.list(request.workspace_id)[:500]
+                            ],
+                        )
+                    )
+                    findings = await session.scalars(
+                        select(SecDeskFinding).order_by(SecDeskFinding.created_at.desc()).limit(500)
+                    )
+                    sections.append(
+                        (
+                            "Explicit SecDesk findings",
+                            [
+                                [
+                                    clean(row.tool_id),
+                                    clean(row.severity),
+                                    clean(row.target),
+                                    clean(row.title),
+                                ]
+                                for row in findings
                             ],
                         )
                     )

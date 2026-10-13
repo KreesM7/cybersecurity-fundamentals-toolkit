@@ -18,6 +18,7 @@ from pydantic import BaseModel
 from shared.activity import TerminalCommand
 from shared.framework import RpcConnect
 from shared.schemas import HealthResponse, SchemaModel
+from shared.secdesk import NativeInput
 from shared.tools import PasswordOptions
 from shared.vault import SecretRequest
 
@@ -100,7 +101,9 @@ class ApiClient:
             request_headers["X-Request-ID"] = str(request_id or uuid4())
         payload = (
             body.transport_dump()
-            if isinstance(body, (PasswordOptions, RpcConnect, TerminalCommand, SecretRequest))
+            if isinstance(
+                body, (PasswordOptions, RpcConnect, TerminalCommand, SecretRequest, NativeInput)
+            )
             else body.model_dump(mode="json") if body is not None else None
         )
         async with self._client.stream(

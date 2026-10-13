@@ -1,0 +1,49 @@
+{
+  "id": "nikto",
+  "name": "Nikto",
+  "category": "web-security",
+  "one_liner": "Inspect web server configuration with an explicit, authorized CLI scan.",
+  "has_gui": false,
+  "native_gui": false,
+  "console": false,
+  "has_terminal": true,
+  "terminal_recommended": true,
+  "terminal_binary": "nikto",
+  "detect": {
+    "binary": "nikto",
+    "version_flag": ""
+  },
+  "required_services": [],
+  "required_permissions": [
+    "Perl runtime",
+    "Written authorization for web targets"
+  ],
+  "license": null,
+  "overview": "Inspect web server configuration with an explicit, authorized CLI scan.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console."
+  ],
+  "commands": [],
+  "example_success": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://github.com/sullo/nikto/wiki/Basic-Testing",
+  "install_link": "https://github.com/sullo/nikto/wiki"
+}

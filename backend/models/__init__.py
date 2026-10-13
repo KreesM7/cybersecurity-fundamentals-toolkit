@@ -5,6 +5,7 @@ from datetime import datetime
 from pydantic import JsonValue
 from sqlalchemy import (
     JSON,
+    Boolean,
     CheckConstraint,
     DateTime,
     ForeignKey,
@@ -212,3 +213,29 @@ class Artifact(WorkspaceBase):
     sha256: Mapped[str] = mapped_column(String(64))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
     report: Mapped[Report | None] = relationship(back_populates="artifacts")
+
+
+class SecDeskAudit(WorkspaceBase):
+    """Local native launch acknowledgment; never command arguments or output."""
+
+    __tablename__ = "secdesk_audit"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    tool_id: Mapped[str] = mapped_column(String(64))
+    mode: Mapped[str] = mapped_column(String(16))
+    event: Mapped[str] = mapped_column(String(16))
+    authorized: Mapped[bool] = mapped_column(Boolean)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+
+
+class SecDeskFinding(WorkspaceBase):
+    """Explicit normalized observations, redacted before persistence."""
+
+    __tablename__ = "secdesk_findings"
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    identity: Mapped[str] = mapped_column(String(64), unique=True)
+    tool_id: Mapped[str] = mapped_column(String(64))
+    title: Mapped[str] = mapped_column(String(200))
+    severity: Mapped[str] = mapped_column(String(16))
+    target: Mapped[str] = mapped_column(String(200))
+    evidence: Mapped[str] = mapped_column(Text)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True))

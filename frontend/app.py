@@ -21,6 +21,7 @@ from frontend.main_window import MainWindow
 from frontend.runtime import BackendThread, finish_backend
 from frontend.theme import SIZE, apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
+from frontend.views.secdesk import SecDeskPanel
 from frontend.views.tools.base import ToolPanel
 from shared.version import VERSION
 
@@ -87,6 +88,10 @@ def main(argv: list[str] | None = None) -> int:
                     isinstance(panel, ToolPanel) for panel in window.panels.values()
                 ):
                     failed("Seven tool panels could not be created.")
+                    return
+                hubs = window.findChildren(SecDeskPanel)
+                if len(hubs) != 1 or hubs[0].registry_failed or len(hubs[0].tools) != 10:
+                    failed("SecDesk packaged resources could not be loaded.")
                     return
                 for index in range(window.stack.count()):
                     window.stack.setCurrentIndex(index)

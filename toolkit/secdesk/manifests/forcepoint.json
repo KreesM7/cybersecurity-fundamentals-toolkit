@@ -1,0 +1,50 @@
+{
+  "id": "forcepoint",
+  "name": "Forcepoint",
+  "category": "data-loss-prevention",
+  "one_liner": "Use your organization's Security Manager for DLP administration.",
+  "has_gui": true,
+  "native_gui": false,
+  "console": true,
+  "has_terminal": false,
+  "terminal_recommended": false,
+  "terminal_binary": null,
+  "detect": {
+    "binary": null,
+    "version_flag": ""
+  },
+  "required_services": [
+    "Organization-managed Security Manager"
+  ],
+  "required_permissions": [
+    "Assigned administrator role and valid subscription"
+  ],
+  "license": "commercial",
+  "overview": "Use your organization's Security Manager for DLP administration.",
+  "setup_steps": [
+    "Follow the official vendor installation instructions for your OS; nothing is installed automatically.",
+    "Version, service, permission and license status are unknown until verified in the native tool or vendor console."
+  ],
+  "commands": [],
+  "example_success": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: native vendor output has not been captured."
+    ],
+    "why": "Native tool or licensed deployment unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "",
+    "output": "",
+    "annotations": [
+      "Unverified: no native failure output was captured."
+    ],
+    "why": "No native failure run available.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://help.forcepoint.com/dlp/10.3.0/fsmhelp/82FD991E-8604-40D9-909B-576F980C3859.html",
+  "install_link": "https://www.forcepoint.com/product/dlp-data-loss-prevention"
+}

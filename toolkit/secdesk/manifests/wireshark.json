@@ -4,6 +4,7 @@
   "category": "packet-analysis",
   "one_liner": "Inspect saved captures and protocol details in a graphical packet analyzer.",
   "has_gui": true,
+  "native_gui": true,
   "has_terminal": true,
   "terminal_recommended": false,
   "terminal_binary": "tshark",

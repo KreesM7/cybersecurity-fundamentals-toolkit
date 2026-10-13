@@ -4,6 +4,10 @@ import sys
 
 
 def main() -> int:
+    if sys.argv[1:2] == ["secdesk"]:
+        from toolkit.secdesk.cli import main as secdesk_main
+
+        return secdesk_main(sys.argv[2:])
     if sys.argv[1:2] == ["lowrea"]:
         from toolkit.lowrea.cli import main as lowrea_main
 

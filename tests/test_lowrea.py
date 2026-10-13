@@ -118,3 +118,29 @@ def test_direct_construction_canonicalizes_and_rejects_duplicate_fields():
         Evidence(canonical_json='{"schema_version":1,"schema_version":1}')
     with pytest.raises(ValueError):
         Evidence(canonical_json="{}")
+
+
+def test_failed_stream_creation_closes_owned_descriptor(tmp_path, monkeypatch, capsys):
+    import os
+
+    from toolkit.lowrea import cli
+
+    path = tmp_path / "artifact"
+    path.write_bytes(b"owned")
+    opened = []
+    original = os.open
+
+    def capture_descriptor(*args, **kwargs):
+        descriptor = original(*args, **kwargs)
+        opened.append(descriptor)
+        return descriptor
+
+    def fail_stream(*args, **kwargs):
+        raise OSError("Cannot create stream")
+
+    monkeypatch.setattr(cli.os, "open", capture_descriptor)
+    monkeypatch.setattr(cli.os, "fdopen", fail_stream)
+    assert cli.main(["inventory-artifact", str(path)]) == 1
+    assert json.loads(capsys.readouterr().out)["isError"]
+    with pytest.raises(OSError):
+        os.fstat(opened[0])

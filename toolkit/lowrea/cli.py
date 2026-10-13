@@ -38,19 +38,22 @@ def main(arguments: list[str] | None = None) -> int:
     args = parser.parse_args(arguments)
     try:
         descriptor = os.open(args.path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
-        with os.fdopen(descriptor, "rb") as stream:
-            if not stat.S_ISREG(os.fstat(stream.fileno()).st_mode):
+        try:
+            if not stat.S_ISREG(os.fstat(descriptor).st_mode):
                 raise ValueError("Expected a regular file")
-            before = os.fstat(stream.fileno())
-            digest, signature, size = read_identity(stream, before.st_size)
-            after = os.fstat(stream.fileno())
-            if (before.st_size, before.st_mtime_ns, before.st_ctime_ns, before.st_ino) != (
-                after.st_size,
-                after.st_mtime_ns,
-                after.st_ctime_ns,
-                after.st_ino,
-            ) or size != after.st_size:
-                raise ValueError("Artifact changed while recording identity")
+            with os.fdopen(descriptor, "rb", closefd=False) as stream:
+                before = os.fstat(stream.fileno())
+                digest, signature, size = read_identity(stream, before.st_size)
+                after = os.fstat(stream.fileno())
+                if (before.st_size, before.st_mtime_ns, before.st_ctime_ns, before.st_ino) != (
+                    after.st_size,
+                    after.st_mtime_ns,
+                    after.st_ctime_ns,
+                    after.st_ino,
+                ) or size != after.st_size:
+                    raise ValueError("Artifact changed while recording identity")
+        finally:
+            os.close(descriptor)
         evidence = Evidence.create(
             "inventory_artifact",
             {"size": after.st_size, "signature_hex": signature},

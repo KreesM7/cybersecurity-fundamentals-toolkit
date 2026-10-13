@@ -251,6 +251,19 @@ class StatusBadge(QLabel):
         )
         painter.end()
 
+    def set_status(self, text: str, state: str) -> None:
+        """Use the existing badge appearance with an explicit readiness state."""
+        if state not in {"ready", "running", "done", "failed", "cancelled"}:
+            raise ValueError("Unknown badge state")
+        self.setText(text)
+        self.setProperty("state", state)
+        QLabel.setText(self, text)
+        self.setAccessibleName(state.title() + ": " + text)
+        style = self.style()
+        if style:
+            style.unpolish(self)
+            style.polish(self)
+
     def setText(self, text: str | None) -> None:  # noqa: N802
         value = text or "Ready"
         self.raw_text = value

@@ -33,6 +33,7 @@ from backend.routers import (
     modules,
     payloads,
     reports,
+    secdesk,
     targets,
     tools,
     vault,
@@ -171,6 +172,7 @@ def create_app(
     app.include_router(vault.router, prefix="/api/v1")
     app.include_router(reports.router, prefix="/api/v1")
     app.include_router(desktop.router, prefix="/api/v1")
+    app.include_router(secdesk.router, prefix="/api/v1")
 
     @app.exception_handler(RequestValidationError)
     async def validation_error(request: Request, exc: RequestValidationError) -> JSONResponse:

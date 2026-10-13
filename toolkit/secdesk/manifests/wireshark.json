@@ -1,0 +1,59 @@
+{
+  "id": "wireshark",
+  "name": "Wireshark",
+  "category": "packet-analysis",
+  "one_liner": "Inspect saved captures and protocol details in a graphical packet analyzer.",
+  "has_gui": true,
+  "has_terminal": true,
+  "terminal_recommended": false,
+  "terminal_binary": "tshark",
+  "detect": {
+    "binary": "wireshark",
+    "version_flag": "--version",
+    "windows_program_files_path": "Wireshark/Wireshark.exe"
+  },
+  "required_services": [],
+  "required_permissions": [
+    "Capture permissions must be checked before live capture"
+  ],
+  "license": null,
+  "overview": "Inspect saved captures and protocol details in a graphical packet analyzer. TShark provides a terminal interface. Capturing live traffic requires separately verified permissions.",
+  "setup_steps": [
+    "Use the official download link for your operating system. SecDesk never installs automatically.",
+    "Version and capture permission checks are unverified until an explicit check or real tool run.",
+    "Windows capture needs the vendor-supported capture driver. Tcpdump Windows support is unverified in this environment."
+  ],
+  "commands": [
+    {
+      "cmd": "tshark --version",
+      "explain": "Print the installed build version.",
+      "verification": "official-docs"
+    },
+    {
+      "cmd": "tshark -r capture.pcap",
+      "explain": "Read packets from a saved capture; this does not start live capture.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "tshark --version",
+    "output": "",
+    "annotations": [
+      "Unverified: tool was not found in the test environment; no output is invented."
+    ],
+    "why": "Executable unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "tshark -r capture.pcap",
+    "output": "",
+    "annotations": [
+      "Unverified: no real native failure was captured."
+    ],
+    "why": "Executable unavailable.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://www.wireshark.org/docs/man-pages/tshark.html",
+  "install_link": "https://www.wireshark.org/download.html"
+}

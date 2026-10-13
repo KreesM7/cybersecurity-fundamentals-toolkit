@@ -593,6 +593,7 @@ build = [
 ]
 dev = [
     { name = "black" },
+    { name = "jsonschema" },
     { name = "mypy" },
     { name = "pytest" },
     { name = "pytest-asyncio" },
@@ -622,6 +623,7 @@ requires-dist = [
     { name = "fastapi", specifier = "==0.142.2" },
     { name = "httpx", specifier = "==0.28.1" },
     { name = "jinja2", specifier = "==3.1.6" },
+    { name = "jsonschema", marker = "extra == 'dev'", specifier = "==4.26.0" },
     { name = "keyring", specifier = "==25.7.0" },
     { name = "mypy", marker = "extra == 'dev'", specifier = "==2.4.0" },
     { name = "pexpect", marker = "sys_platform != 'win32'", specifier = "==4.9.0" },

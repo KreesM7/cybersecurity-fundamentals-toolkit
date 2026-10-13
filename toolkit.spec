@@ -16,6 +16,7 @@ if sys.platform == 'win32':
         str(windows / 'System32'), str(windows),
     ])
 datas = (collect_data_files('toolkit.resources')
+         + collect_data_files('toolkit.secdesk', includes=['registry.json', 'manifests/*.json'])
          + collect_data_files('frontend', includes=['resources/themes/*.qss', 'resources/icons/*', 'resources/examples/*'])
          + collect_data_files('backend.repositories.migrations', include_py_files=True)
          + collect_data_files('backend', includes=['resources/*.ps1'])

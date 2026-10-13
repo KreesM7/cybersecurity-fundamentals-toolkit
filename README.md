@@ -190,3 +190,8 @@ remediation and exits 0 or 1 respectively. No external analysis engine is requir
 for this operation. This is not a disassembler or the completed LowREA suite.
 See [LowREA status](docs/lowrea/STATUS.md) and [integration design](docs/lowrea/DESIGN.md).
 The published v2.1.0 installers do not include LowREA.
+
+
+## SecDesk (initial source integration)
+
+Open **SecDesk** in the sidebar for Wireshark/Tcpdump documentation and passive installation checks. Native launching, embedded terminals and the remaining tools are not delivered yet. See [SecDesk status](docs/secdesk/STATUS.md), [sources](docs/secdesk/SOURCES.md) and [development resource rules](docs/DEV_WORKFLOW.md).

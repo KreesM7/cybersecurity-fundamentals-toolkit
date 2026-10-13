@@ -84,7 +84,7 @@ def test_every_page_input_has_help_and_accessible_name_and_nine_guides(app):
     window.show()
     app.processEvents()
     try:
-        assert len(window.page_indices) == 17
+        assert len(window.page_indices) == 18
         for page, index in window.page_indices.items():
             window.navigate_title(page)
             app.processEvents()

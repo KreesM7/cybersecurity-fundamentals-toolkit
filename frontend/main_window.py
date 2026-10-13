@@ -29,6 +29,7 @@ from frontend.views.desktop import DesktopControls
 from frontend.views.modules import ModuleBrowser
 from frontend.views.payloads import PayloadPanel
 from frontend.views.reports import ReportsPanel
+from frontend.views.secdesk import SecDeskPanel
 from frontend.views.tools import PANELS, create_panel
 from frontend.views.vault import VaultPanel
 from frontend.views.workspaces import ArtifactsPanel, TargetsPanel, WorkspacePanel
@@ -124,6 +125,7 @@ class MainWindow(QMainWindow):
             self.register_view("Artifacts", ArtifactsPanel(view_model))
             self.register_view("Vault", VaultPanel(view_model))
             self.register_view("Reports", ReportsPanel(view_model))
+            self.register_view("SecDesk", SecDeskPanel(view_model))
             self.register_view("Settings", desktop_controls.settings_panel)
             for keys, callback in (
                 ("Ctrl+K", self.command_palette),

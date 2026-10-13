@@ -1,0 +1,58 @@
+{
+  "id": "tcpdump",
+  "name": "Tcpdump",
+  "category": "packet-analysis",
+  "one_liner": "Read saved captures or capture packets through a terminal.",
+  "has_gui": false,
+  "has_terminal": true,
+  "terminal_recommended": true,
+  "terminal_binary": "tcpdump",
+  "detect": {
+    "binary": "tcpdump",
+    "version_flag": "--version"
+  },
+  "required_services": [],
+  "required_permissions": [
+    "Capture permissions must be checked before live capture"
+  ],
+  "license": null,
+  "overview": "Read saved captures or capture packets through a terminal. Capture access depends on the operating system and interface permissions.",
+  "setup_steps": [
+    "Use the official download link for your operating system. SecDesk never installs automatically.",
+    "Version and capture permission checks are unverified until an explicit check or real tool run.",
+    "Windows capture needs the vendor-supported capture driver. Tcpdump Windows support is unverified in this environment."
+  ],
+  "commands": [
+    {
+      "cmd": "tcpdump --version",
+      "explain": "Print version information.",
+      "verification": "official-docs"
+    },
+    {
+      "cmd": "tcpdump -n -r capture.pcap",
+      "explain": "Read a saved capture without converting addresses to names.",
+      "verification": "official-docs"
+    }
+  ],
+  "example_success": {
+    "cmd": "tcpdump --version",
+    "output": "",
+    "annotations": [
+      "Unverified: tool was not found in the test environment; no output is invented."
+    ],
+    "why": "Executable unavailable.",
+    "verified": false
+  },
+  "example_failure": {
+    "cmd": "tcpdump -n -r capture.pcap",
+    "output": "",
+    "annotations": [
+      "Unverified: no real native failure was captured."
+    ],
+    "why": "Executable unavailable.",
+    "verified": false
+  },
+  "errors": [],
+  "docs_link": "https://github.com/the-tcpdump-group/tcpdump/blob/master/tcpdump.1.in",
+  "install_link": "https://www.tcpdump.org/"
+}

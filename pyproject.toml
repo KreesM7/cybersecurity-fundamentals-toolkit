@@ -41,7 +41,7 @@ pdf = ["weasyprint==70.0"]
 build = ["PyInstaller==6.22.3"]
 dev = [
   "pytest==9.1.1", "pytest-asyncio==1.4.0", "pytest-cov==7.1.0",
-  "black==26.10.0", "ruff==0.16.10", "mypy==2.4.0",
+  "black==26.10.0", "ruff==0.16.10", "mypy==2.4.0", "jsonschema==4.26.0",
 ]
 
 [tool.setuptools.packages.find]
@@ -51,6 +51,7 @@ include = ["backend*", "frontend*", "shared*", "toolkit*"]
 backend = ["resources/*.ps1"]
 frontend = ["resources/themes/*.qss", "resources/icons/*", "resources/examples/*"]
 "toolkit.resources" = ["*.txt"]
+"toolkit.secdesk" = ["registry.json", "manifests/*.json"]
 
 [tool.black]
 line-length = 100

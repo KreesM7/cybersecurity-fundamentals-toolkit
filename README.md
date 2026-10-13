@@ -181,3 +181,12 @@ exports the redacted display to a local text file; it does not add a workspace c
 Regenerate them with `python scripts/capture_ui.py`; regenerate app icon exports with
 `python scripts/render_app_icon.py`. The original Toolkit Line SVG glyphs share a 2-unit
 stroke and are licensed with the application under MIT.
+
+## LowREA (source checkout; implementation in progress)
+
+`python -m toolkit lowrea inventory-artifact PATH` records a local file's byte
+identity without executing it. It returns JSON evidence or a diagnostic with a
+remediation and exits 0 or 1 respectively. No external analysis engine is required
+for this operation. This is not a disassembler or the completed LowREA suite.
+See [LowREA status](docs/lowrea/STATUS.md) and [integration design](docs/lowrea/DESIGN.md).
+The published v2.1.0 installers do not include LowREA.

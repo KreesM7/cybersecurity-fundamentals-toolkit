@@ -140,4 +140,4 @@ jobs:
       - name: Verify non-root test environment
         run: |
           test "$(docker run --rm --entrypoint id toolkit-tests -u)" = 10001
-          docker run --rm toolkit-tests
+          docker run --rm --init toolkit-tests

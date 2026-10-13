@@ -110,3 +110,17 @@ def test_detection_rejects_absolute_or_escaping_paths():
     for path in ("C:/tools/tool.exe", "../tool.exe", r"\\server\tool.exe", "/tool.exe"):
         with pytest.raises(ValueError):
             Detection(binary="tool", version_flag="--version", windows_program_files_path=path)
+
+
+def test_headless_tshark_discovery_does_not_require_gui(tmp_path, monkeypatch):
+    from toolkit.secdesk.registry import locate_binary
+
+    tool = next(tool for tool in load_registry() if tool.id == "wireshark")
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    monkeypatch.setattr(
+        "toolkit.secdesk.registry.shutil.which",
+        lambda name: "/fixture/tshark" if name == "tshark" else None,
+    )
+    assert locate_binary(tool, terminal=True) == "/fixture/tshark"
+    assert locate_binary(tool) is None
+    assert doctor(tool).status == "needs_setup"

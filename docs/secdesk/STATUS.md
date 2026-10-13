@@ -29,3 +29,5 @@ Rulings: reuse PyQt6/FastAPI instead of Tauri because existing tested packaging,
 - Real Qt screenshots inspected for grid/details, semantic license/idle badges and documentation/launch layout. No decorative image assets added.
 
 Release and deployment limits remain as listed above. No 2.2.0 installer was published, no vendor deployment/license was verified, and no firmware command was sent. Production profiles/vaults were not migrated in these checks.
+
+Final follow-up: interface-specific discovery supports headless TShark without the GUI binary. Windows and Linux SecDesk suites each passed 32 tests. Container cleanup distinguishes exited zombies from live children; Docker's test process uses an init reaper. The report fixture awaits the existing job-completion API with a bounded timeout, rather than asserting a two-second shared-runner disk-speed limit. Production report behavior and functional/redaction assertions remain unchanged.

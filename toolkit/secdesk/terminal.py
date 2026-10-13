@@ -123,6 +123,16 @@ class NativeTerminal:
             else:
                 self._pty.setwinsize(rows, columns)
 
+    def _live(self, processes: list[psutil.Process]) -> list[psutil.Process]:
+        result = []
+        for process in processes:
+            try:
+                if process.is_running() and process.status() != self._psutil.STATUS_ZOMBIE:
+                    result.append(process)
+            except self._psutil.NoSuchProcess:
+                pass
+        return result
+
     def close(self) -> None:
         if self.closed:
             return
@@ -144,13 +154,16 @@ class NativeTerminal:
                     self._pty.close(force=True)
                     processes = processes[:-1]
                 _, alive = self._psutil.wait_procs(processes, timeout=2)
+                # An exited child can remain a zombie under a container's PID 1.
+                # Only its parent/init can reap it; it has no live handles or code.
+                alive = self._live(alive)
                 for process in alive:
                     try:
                         process.kill()
                     except self._psutil.NoSuchProcess:
                         pass
                 _, alive = self._psutil.wait_procs(alive, timeout=2)
-                if alive:
+                if self._live(alive):
                     raise RuntimeError("Owned terminal processes did not exit")
         except self._psutil.NoSuchProcess:
             pass

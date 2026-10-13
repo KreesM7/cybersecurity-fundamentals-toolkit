@@ -59,21 +59,17 @@ async def test_report_job_scope_redaction_and_replay(tmp_path):
         job = await app.state.reports.generate(request, identifier)
         again = await app.state.reports.generate(request, identifier)
         assert again.id == job.id
-        for _ in range(100):
-            job = app.state.jobs.get(job.id, scope)
-            if job.status not in {"queued", "running"}:
-                break
-            await asyncio.sleep(0.02)
+        # This verifies completion, not shared-runner disk speed.
+        await asyncio.wait_for(app.state.jobs.wait_idle(), timeout=15)
+        job = app.state.jobs.get(job.id, scope)
         assert job.status == "succeeded", job.error
         content = await app.state.artifacts.read(scope, UUID(job.result["artifact_id"]))
         assert b"fixture-secret" not in content and b"Explicitly included notes" not in content
         request.include_notes = True
         job = await app.state.reports.generate(request, uuid4())
-        for _ in range(100):
-            job = app.state.jobs.get(job.id, scope)
-            if job.status not in {"queued", "running"}:
-                break
-            await asyncio.sleep(0.02)
+        # This verifies completion, not shared-runner disk speed.
+        await asyncio.wait_for(app.state.jobs.wait_idle(), timeout=15)
+        job = app.state.jobs.get(job.id, scope)
         assert job.status == "succeeded", job.error
         content = await app.state.artifacts.read(scope, UUID(job.result["artifact_id"]))
         assert b"fixture-secret" not in content and b"[REDACTED]" in content

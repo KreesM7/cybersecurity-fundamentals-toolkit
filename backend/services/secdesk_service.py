@@ -29,7 +29,7 @@ from shared.secdesk import (
     NativeSnapshot,
 )
 from toolkit.secdesk.gui_process import NativeGUI
-from toolkit.secdesk.registry import doctor, load_registry
+from toolkit.secdesk.registry import load_registry, locate_binary
 from toolkit.secdesk.terminal import NativeTerminal
 
 T = TypeVar("T")
@@ -98,7 +98,7 @@ class SecDeskService:
             raise ValueError("Tool has no terminal interface")
         if data.mode == "gui" and not tool.native_gui:
             raise ValueError("Use the configured web console or tool documentation")
-        located = await native_call(lambda: doctor(tool).binary_path)
+        located = await native_call(lambda: locate_binary(tool, terminal=data.mode == "terminal"))
         if not located:
             raise ValueError("Native tool not found; review Setup and recheck")
         async with self._lock:

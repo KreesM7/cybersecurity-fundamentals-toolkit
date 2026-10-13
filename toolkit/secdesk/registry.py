@@ -152,6 +152,21 @@ def load_registry(directory: Path | None = None) -> list[ToolManifest]:
     return result
 
 
+def locate_binary(tool: ToolManifest, *, terminal: bool = False) -> str | None:
+    """Resolve only the requested interface, without executing the binary."""
+    binary = tool.terminal_binary if terminal else tool.detect.binary
+    if binary is None:
+        return None
+    located = shutil.which(binary)
+    if not located and os.name == "nt" and tool.detect.windows_program_files_path:
+        candidate = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
+        candidate = candidate / tool.detect.windows_program_files_path
+        if terminal and binary != tool.detect.binary:
+            candidate = candidate.with_name(binary + ".exe")
+        located = str(candidate) if candidate.is_file() else None
+    return located
+
+
 def doctor(tool: ToolManifest) -> Check:
     if tool.detect.binary is None:
         return Check(
@@ -163,11 +178,9 @@ def doctor(tool: ToolManifest) -> Check:
             ),
             remediation="Review the vendor Setup instructions. No endpoint was contacted.",
         )
-    located = shutil.which(tool.detect.binary)
-    if not located and os.name == "nt" and tool.detect.windows_program_files_path:
-        candidate = Path(os.environ.get("ProgramFiles", "C:/Program Files"))
-        candidate = candidate / tool.detect.windows_program_files_path
-        located = str(candidate) if candidate.is_file() else None
+    located = locate_binary(tool) or (
+        locate_binary(tool, terminal=True) if tool.has_terminal else None
+    )
     if not located:
         return Check(
             tool_id=tool.id,

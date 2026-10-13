@@ -195,3 +195,36 @@ async def test_immediate_stop_cleans_monitor_cancelled_before_start(tmp_path, mo
     finally:
         await service.close()
         await workspaces.close()
+
+
+async def test_service_allows_tshark_only_terminal_and_rejects_missing_gui(tmp_path, monkeypatch):
+    import shutil
+
+    from backend.events import EventHub
+    from backend.services.secdesk_service import SecDeskService
+    from backend.services.workspace_service import WorkspaceService
+    from shared.secdesk import NativeLaunch
+
+    original = shutil.which
+    monkeypatch.setenv("ProgramFiles", str(tmp_path))
+    monkeypatch.setattr(
+        "toolkit.secdesk.registry.shutil.which",
+        lambda name: (
+            sys.executable if name == "tshark" else original("sh") if name == "sh" else None
+        ),
+    )
+    workspaces = WorkspaceService(tmp_path)
+    await workspaces.start()
+    service = SecDeskService(workspaces, EventHub())
+    launch = NativeLaunch(
+        workspace_id=workspaces.active_id, tool_id="wireshark", mode="terminal", authorized=True
+    )
+    try:
+        with pytest.raises(ValueError, match="Native tool not found"):
+            await service.open(launch.model_copy(update={"mode": "gui"}))
+        row = await service.open(launch)
+        await service.stop(row)
+        assert service.owned[row.id].released
+    finally:
+        await service.close()
+        await workspaces.close()

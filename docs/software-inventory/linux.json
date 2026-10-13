@@ -100,6 +100,42 @@
       "matched_files": 43
     },
     {
+      "name": "argon2-cffi",
+      "version": "25.1.0",
+      "license": "MIT",
+      "license_classifiers": [],
+      "notices": [
+        "licenses/argon2-cffi-25.1.0/argon2_cffi-25.1.0.dist-info/licenses/LICENSE"
+      ],
+      "sources": [
+        {
+          "url": "https://files.pythonhosted.org/packages/0e/89/ce5af8a7d472a67cc819d5d998aa8c82c5d860608c4db9f46f1162d7dab9/argon2_cffi-25.1.0.tar.gz",
+          "sha256": "694ae5cc8a42f4c4e2bf2ca0e64e51e23a040c6a517a85074683d3959e1346c1",
+          "file": "argon2_cffi-25.1.0.tar.gz"
+        }
+      ],
+      "role": "bundled",
+      "matched_files": 13
+    },
+    {
+      "name": "argon2-cffi-bindings",
+      "version": "26.1.0",
+      "license": "MIT",
+      "license_classifiers": [],
+      "notices": [
+        "licenses/argon2-cffi-bindings-26.1.0/argon2_cffi_bindings-26.1.0.dist-info/licenses/LICENSE"
+      ],
+      "sources": [
+        {
+          "url": "https://files.pythonhosted.org/packages/0b/43/bb8b6e8708d49a5ab36781333af092d9f483b198a2710d01281204640055/argon2_cffi_bindings-26.1.0.tar.gz",
+          "sha256": "63505c71542a44b68b1e38060450fb006404170da375feb31af153e7f9c6205d",
+          "file": "argon2_cffi_bindings-26.1.0.tar.gz"
+        }
+      ],
+      "role": "bundled",
+      "matched_files": 2
+    },
+    {
       "name": "beautifulsoup4",
       "version": "4.15.0",
       "license": "MIT License",
@@ -118,24 +154,6 @@
       ],
       "role": "bundled",
       "matched_files": 14
-    },
-    {
-      "name": "brotli",
-      "version": "1.2.0",
-      "license": "MIT",
-      "license_classifiers": [],
-      "notices": [
-        "licenses/brotli-1.2.0/brotli-1.2.0.dist-info/licenses/LICENSE"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/f7/16/c92ca344d646e71a43b8bb353f0a6490d7f6e06210f8554c8f874e454285/brotli-1.2.0.tar.gz",
-          "sha256": "e310f77e41941c13340a95976fe66a8a95b01e783d430eeaf7a2f87e0a57dd0a",
-          "file": "brotli-1.2.0.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 2
     },
     {
       "name": "certifi",
@@ -229,7 +247,7 @@
         }
       ],
       "role": "bundled",
-      "matched_files": 70
+      "matched_files": 68
     },
     {
       "name": "darkdetect",
@@ -250,24 +268,6 @@
       ],
       "role": "bundled",
       "matched_files": 5
-    },
-    {
-      "name": "ecdsa",
-      "version": "0.19.2",
-      "license": "MIT",
-      "license_classifiers": [],
-      "notices": [
-        "licenses/ecdsa-0.19.2/ecdsa-0.19.2.dist-info/LICENSE"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/25/ca/8de7744cb3bc966c85430ca2d0fcaeea872507c6a4cf6e007f7fe269ed9d/ecdsa-0.19.2.tar.gz",
-          "sha256": "62635b0ac1ca2e027f82122b5b81cb706edc38cd91c63dda28e4f3455a2bf930",
-          "file": "ecdsa-0.19.2.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 16
     },
     {
       "name": "fastapi",
@@ -607,24 +607,6 @@
       "matched_files": 6
     },
     {
-      "name": "pyasn1",
-      "version": "0.6.4",
-      "license": "BSD-2-Clause",
-      "license_classifiers": [],
-      "notices": [
-        "licenses/pyasn1-0.6.4/pyasn1-0.6.4.dist-info/licenses/LICENSE.rst"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/a4/9a/23310166d960def5897e91fe20e5b724601b02a22e84ba1f94232c0b7f67/pyasn1-0.6.4.tar.gz",
-          "sha256": "9c447d8431c947fe4c8febc4ed9e760bc29011a5b01e5c74b67025bd9fb8ce81",
-          "file": "pyasn1-0.6.4.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 28
-    },
-    {
       "name": "pydantic",
       "version": "2.13.5",
       "license": "MIT",
@@ -717,7 +699,7 @@
         }
       ],
       "role": "bundled",
-      "matched_files": 5
+      "matched_files": 6
     },
     {
       "name": "PyQt6-Qt6",
@@ -766,26 +748,6 @@
       ],
       "role": "bundled",
       "matched_files": 5
-    },
-    {
-      "name": "python-jose",
-      "version": "3.5.0",
-      "license": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
-      "notices": [
-        "licenses/python-jose-3.5.0/python_jose-3.5.0.dist-info/licenses/LICENSE"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/c6/77/3a1c9039db7124eb039772b935f2244fbb73fc8ee65b9acf2375da1c07bf/python_jose-3.5.0.tar.gz",
-          "sha256": "fb4eaa44dbeb1c26dcc69e4bd7ec54a1cb8dd64d3b4d81ef08d90ff453f2b01b",
-          "file": "python_jose-3.5.0.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 14
     },
     {
       "name": "python-magic",
@@ -846,26 +808,6 @@
       "matched_files": 2
     },
     {
-      "name": "rsa",
-      "version": "4.9.1",
-      "license": "Apache-2.0",
-      "license_classifiers": [
-        "License :: OSI Approved :: Apache Software License"
-      ],
-      "notices": [
-        "licenses/rsa-4.9.1/rsa-4.9.1.dist-info/LICENSE"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/da/8a/22b7beea3ee0d44b1916c0c1cb0ee3af23b700b6da9f04991899d0c555d4/rsa-4.9.1.tar.gz",
-          "sha256": "e7bdbfdb5497da4c07dfd35530e1a902659db6ff241e39d9953cad06ebd0ae75",
-          "file": "rsa-4.9.1.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 11
-    },
-    {
       "name": "SecretStorage",
       "version": "3.5.0",
       "license": "BSD-3-Clause",
@@ -916,26 +858,6 @@
       ],
       "role": "bundled",
       "matched_files": 149
-    },
-    {
-      "name": "six",
-      "version": "1.17.0",
-      "license": "MIT",
-      "license_classifiers": [
-        "License :: OSI Approved :: MIT License"
-      ],
-      "notices": [
-        "licenses/six-1.17.0/six-1.17.0.dist-info/LICENSE"
-      ],
-      "sources": [
-        {
-          "url": "https://files.pythonhosted.org/packages/94/e7/b2c673351809dca68a0e064b6af791aa332cf192da575fd474ed7d6f16a2/six-1.17.0.tar.gz",
-          "sha256": "ff70335d468e7eb6ec65b95b99d3a2836546063f63acc5171de367e834932a81",
-          "file": "six-1.17.0.tar.gz"
-        }
-      ],
-      "role": "bundled",
-      "matched_files": 1
     },
     {
       "name": "soupsieve",
@@ -1174,9 +1096,10 @@
     "PyQt6/QtCore.abi3.so",
     "PyQt6/QtDBus.abi3.so",
     "PyQt6/QtGui.abi3.so",
+    "PyQt6/QtSvg.abi3.so",
     "PyQt6/QtWidgets.abi3.so",
     "PyQt6/sip.cpython-312-x86_64-linux-gnu.so",
-    "_brotli.cpython-312-x86_64-linux-gnu.so",
+    "_argon2_cffi_bindings/_ffi.abi3.so",
     "_cffi_backend.cpython-312-x86_64-linux-gnu.so",
     "charset_normalizer/cd.cpython-312-x86_64-linux-gnu.so",
     "charset_normalizer/md.cpython-312-x86_64-linux-gnu.so",

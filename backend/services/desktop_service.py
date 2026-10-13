@@ -11,6 +11,7 @@ from backend.events import EventHub
 from backend.platform_utils import assert_private_path, atomic_private_write
 from backend.services.update_service import UpdateService, release_notice
 from shared.desktop import DesktopSettings, UpdateNotice, UpdateProgress
+from shared.version import CURRENT_VERSION, VERSION
 
 REPOSITORY = "KreesM7/cybersecurity-fundamentals-toolkit"
 RELEASE_API = f"https://api.github.com/repos/{REPOSITORY}/releases/latest"
@@ -44,7 +45,11 @@ class DesktopService:
                 self.etag = str(data.get("etag", ""))[:512]
                 notice = UpdateNotice.model_validate(data.get("notice", {}))
                 version = stable_version(notice.version)
-                if version and version > (2, 0, 0) and notice.url == RELEASE_PAGE + notice.version:
+                if (
+                    version
+                    and version > CURRENT_VERSION
+                    and notice.url == RELEASE_PAGE + notice.version
+                ):
                     self.notice = notice
             except (ValueError, TypeError, KeyError):
                 # Only non-secret preferences are reset; application data is untouched.
@@ -95,7 +100,10 @@ class DesktopService:
             return
         try:
             async with asyncio.timeout(5):
-                headers = {"Accept": "application/vnd.github+json", "User-Agent": "Toolkit/2.0.0"}
+                headers = {
+                    "Accept": "application/vnd.github+json",
+                    "User-Agent": f"Toolkit/{VERSION}",
+                }
                 if self.etag:
                     headers["If-None-Match"] = self.etag
                 async with httpx.AsyncClient(
@@ -129,7 +137,7 @@ class DesktopService:
                                 return
                             self.notice = (
                                 release_notice(tag, result)
-                                if version > (2, 0, 0)
+                                if version > CURRENT_VERSION
                                 else UpdateNotice()
                             )
                             self.etag = response.headers.get("etag", "")[:512]

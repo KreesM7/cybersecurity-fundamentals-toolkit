@@ -1,5 +1,17 @@
 # Changelog
 
+
+## 2.1.0 — 2026-10-12
+
+- Guided desktop workflows, consistent navigation, field help and accessible status badges.
+- Windows Settings: explicit download, SHA-256 and Sigstore verification, then install/restart in place.
+- Argon2id vault migration, opaque sessions, unlock backoff, broader secret redaction and audit events.
+- Locked dependency auditing, full-history secret scanning, CodeQL and signed release inventories/SBOMs.
+- Linux remains notify-only for updates. External Nmap, libmagic and Metasploit remain separate prerequisites.
+
+Existing 2.0.0 installations need this installer once to gain the in-app installer.
+Detached Sigstore signatures verify provenance; Windows Authenticode remains unavailable.
+
 ## Unreleased
 
 - Redact prefixed secret fields, JSON values, credential URLs, sensitive headers, JWTs and exception logs; bound work on long log identifiers.

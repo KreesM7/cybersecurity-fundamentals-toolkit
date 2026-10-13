@@ -22,6 +22,7 @@ from frontend.runtime import BackendThread, finish_backend
 from frontend.theme import SIZE, apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.tools.base import ToolPanel
+from shared.version import VERSION
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -69,7 +70,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         window = MainWindow(model)
         window.desktop_controls.owns_backend = owned
-        message = consume_update_message(profile, "2.0.0") if owned else ""
+        message = consume_update_message(profile, VERSION) if owned else ""
         notification = window.statusBar()
         if message and notification is not None:
             notification.showMessage(message, 12000)

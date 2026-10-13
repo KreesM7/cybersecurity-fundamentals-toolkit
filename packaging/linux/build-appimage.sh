@@ -13,4 +13,4 @@ cp -a "$SOURCE" "$DEST/usr/lib/toolkit"
 cp packaging/linux/AppRun "$DEST/AppRun"
 cp packaging/linux/toolkit.desktop packaging/linux/toolkit.svg "$DEST/"
 chmod +x "$DEST/AppRun"
-ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run --runtime-file "$RUNTIME" "$DEST" dist/installers/Toolkit-2.0.0-Linux-x86_64.AppImage
+ARCH=x86_64 "$APPIMAGETOOL" --appimage-extract-and-run --runtime-file "$RUNTIME" "$DEST" dist/installers/Toolkit-2.1.0-Linux-x86_64.AppImage

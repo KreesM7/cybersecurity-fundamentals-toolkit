@@ -23,7 +23,7 @@ class HealthResponse(SchemaModel):
     """Identity and readiness of the authenticated local backend instance."""
 
     schema_version: Literal[1] = 1
-    version: Literal["2.0.0"] = "2.0.0"
+    version: Literal["2.1.0"] = "2.1.0"
     instance_id: Name
     status: Literal["ready"] = "ready"
 

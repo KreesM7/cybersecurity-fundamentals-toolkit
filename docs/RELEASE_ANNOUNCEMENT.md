@@ -1,13 +1,31 @@
-# Cybersecurity Fundamentals Toolkit 2.0.0
+# Cybersecurity Fundamentals Toolkit 2.1.0
 
-A native desktop for seven security fundamentals tools, local workspaces, dedicated Metasploit integration, an encrypted vault, and reports.
+This release includes the updated desktop and in-app Windows updater, plus the vault,
+redaction and supply-chain hardening completed since 2.0.0.
 
-Windows: download the x64 Setup executable, install for your user, and launch from Start. Python is included. The portable ZIP must remain intact beside its `_internal` folder. Linux: use the x86_64 AppImage on Ubuntu 24.04+; the README lists host libraries and FUSE-free startup.
+## Download
 
-External Metasploit, Scapy, Nmap and libmagic are installed separately. The app opens with actionable readiness messages when they are absent. Scanning and web testing require explicit authorization; saved traffic analysis does not generate traffic. Only assess systems you own or have permission to test.
+- **Windows x64:** `Toolkit-2.1.0-Windows-x64-Setup.exe` upgrades the existing per-user installation.
+- **Windows portable:** extract the entire portable ZIP and keep `_internal` beside the executable.
+- **Linux x86_64:** the AppImage targets Ubuntu 24.04+; use `--appimage-extract-and-run` without FUSE.
 
-This release includes themes, searchable navigation, workspace/target management, module options and target transfer, bounded session/job consoles, cancellable payload artifacts, a credential vault with explicit acceptance, and escaped reports. Packaged PDF requests fall back to HTML. Update checking is optional and does not install anything.
+Install 2.1.0 once from this release if you are on 2.0.0. Future Windows updates can be
+installed from Settings: Download update, wait for checksum/signature verification,
+then explicitly click Install & restart. Source/portable and Linux installations do
+not auto-apply. Update checks remain optional and off by default.
 
-Verification: four Windows/Linux and Python 3.11/3.12 CI jobs, independent application security review, and fresh-profile installer smoke tests. See docs/RELEASE_VERIFICATION.md for scope and limitations.
+Seven fundamentals tools are included alongside guided workspaces, targets, modules,
+sessions/jobs, encrypted credentials and reporting. Nmap, compatible libmagic and
+Toolkit-MSF/Scapy remain separately installed prerequisites.
 
-The installers are unsigned. Compare downloaded files with SHA256SUMS. Original source is MIT; combined desktop distribution follows GPLv3. Matching dependency sources and Qt source accompany the assets, with licenses and software inventories included in each bundle. Source/build instructions permit rebuilding and replacing compatible Qt libraries.
+## Integrity and limits
+
+SHA256SUMS, Sigstore bundles, CycloneDX SBOMs, exact platform inventories and corresponding
+sources accompany the release. Follow `docs/RELEASE_VERIFICATION.md` to verify the
+GitHub OIDC workflow identity and checksums. Signatures are detached; Windows may still
+show SmartScreen because the installer does not have Authenticode signing.
+
+Results are not a penetration-test certification. Test only systems you own or have
+permission to assess. Capture analysis uses saved files. Packaged reports use HTML;
+PDF support is optional in source installations. Back up important workspaces before
+upgrading; Python/Qt cannot guarantee perfect memory erasure.

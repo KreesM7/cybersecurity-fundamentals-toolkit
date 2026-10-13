@@ -54,6 +54,7 @@ from backend.services.workspace_service import (
     WorkspaceService,
 )
 from shared.schemas import HealthResponse
+from shared.version import VERSION
 
 
 class PrivateAPI(FastAPI):
@@ -142,7 +143,7 @@ def create_app(
 
     app = PrivateAPI(
         title="Cybersecurity Fundamentals Toolkit",
-        version="2.0.0",
+        version=VERSION,
         lifespan=lifespan,
         redoc_url=None,
         telemetry={

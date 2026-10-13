@@ -24,7 +24,7 @@ Use Inno Setup 7.1.0 or a compatible compiler:
 ISCC.exe packaging/windows/toolkit.iss
 ```
 
-The per-user installer goes to `dist/installers/Toolkit-2.0.0-Windows-x64-Setup.exe`. It does not install external tools or remove user profiles during uninstall. Zip the complete frozen directory for a portable alternative; the executable cannot be moved away from `_internal`.
+The per-user installer goes to `dist/installers/Toolkit-2.1.0-Windows-x64-Setup.exe`. It does not install external tools or remove user profiles during uninstall. Zip the complete frozen directory for a portable alternative; the executable cannot be moved away from `_internal`.
 
 Smoke-test with a fresh temporary profile and from a different working directory:
 
@@ -46,8 +46,8 @@ rather than silently selecting a new continuous build. Then:
 
 ```
 APPIMAGETOOL=/absolute/path/appimagetool-x86_64.AppImage sh packaging/linux/build-appimage.sh
-chmod +x dist/installers/Toolkit-2.0.0-Linux-x86_64.AppImage
-dist/installers/Toolkit-2.0.0-Linux-x86_64.AppImage --appimage-extract-and-run --self-test
+chmod +x dist/installers/Toolkit-2.1.0-Linux-x86_64.AppImage
+dist/installers/Toolkit-2.1.0-Linux-x86_64.AppImage --appimage-extract-and-run --self-test
 ```
 
 `--appimage-extract-and-run` supports machines without FUSE. The AppImage runtime license must be included in notices. The Debian directory is a package skeleton, not a verified .deb release. Dockerfile is only for tests, not a network-accessible backend deployment.

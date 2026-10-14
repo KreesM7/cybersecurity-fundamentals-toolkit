@@ -73,6 +73,38 @@ class GuiTests(unittest.TestCase):
         self.wait_until(lambda: "Caesar Cipher" in self.window.readiness_label.text())
         self.assertIn("Password Strength", self.window.readiness_label.text())
 
+    def test_fundamentals_terminal_runs_real_cipher_password_and_file_jobs(self):
+        import json
+
+        caesar = self.window.panels["caesar"]
+        caesar.terminal_button.click()
+        caesar.command.setText('run {"text":"Hello", "shift":3}')
+        caesar.command.returnPressed.emit()
+        self.wait_until(lambda: "Khoor" in caesar.output.toPlainText())
+        password = self.window.panels["password-strength"]
+        password.terminal_button.click()
+        password.command.setText('run {"password":"practice password"}')
+        password.command.returnPressed.emit()
+        self.wait_until(lambda: '"bits"' in password.output.toPlainText())
+        self.assertEqual(password.command.echoMode(), QLineEdit.EchoMode.Password)
+        self.assertNotIn("practice password", password.output.toPlainText())
+        detector = self.window.panels["dos-detector"]
+        detector.terminal_button.click()
+        detector.command.setText(
+            "run "
+            + json.dumps(
+                {
+                    "file": str(Path(__file__).resolve().parent.parent / "examples/requests.csv"),
+                    "threshold": 1,
+                }
+            )
+        )
+        detector.command.returnPressed.emit()
+        self.wait_until(lambda: '"count"' in detector.output.toPlainText())
+        detector.command.setText("clear")
+        detector.command.returnPressed.emit()
+        self.assertEqual(detector.output.toPlainText(), "")
+
     def test_password_clear_restores_mask_and_erases_backend_job(self):
         panel = self.window.panels["password-strength"]
         panel.password.setText("practice password")

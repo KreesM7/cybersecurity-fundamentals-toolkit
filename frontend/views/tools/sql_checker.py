@@ -17,7 +17,7 @@ from frontend.help_text import TOOL_DESCRIPTIONS
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.tools.base import ToolPanel
 from frontend.widgets.presentation import enhance
-from shared.tools import SQLField, SQLForm, SQLOptions
+from shared.tools import SQLField, SQLForm, SQLOptions, ToolOptions
 
 
 class Panel(ToolPanel):
@@ -78,6 +78,14 @@ class Panel(ToolPanel):
 
     def options(self) -> SQLOptions:
         return SQLOptions(url=self.url.text(), generation=self.target_generation)
+
+    def prepare_terminal_options(self, options: ToolOptions) -> SQLOptions:
+        if not isinstance(options, SQLOptions):
+            raise ValueError("SQL options required.")
+        if options.operation == "discover":
+            self.url.setText(options.url)
+            return options.model_copy(update={"generation": self.target_generation})
+        return options
 
     def show_result(self, result: object) -> None:
         if isinstance(result, dict) and "discovery_id" in result:

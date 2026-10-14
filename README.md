@@ -63,6 +63,10 @@ Dependency pins live in `pyproject.toml`; `requirements.txt` installs the projec
 
 ## Use the modules
 
+Every fundamentals page includes **Open in Terminal** below its description.
+Use `help`, `run`, `run {JSON}`, `cancel`, or `clear`; [command examples](docs/FUNDAMENTALS_TERMINAL.md)
+describe each tool. These in-app consoles use the same backend as the GUI forms.
+
 | Module | Operation and interpretation |
 |---|---|
 | Caesar Cipher | Encrypt/decrypt ASCII letters using shifts 1–25; all 25 decryption candidates are shown. Case, punctuation, whitespace, and non-ASCII characters survive unchanged. Input is limited to 100,000 characters. This is a teaching cipher, not secure encryption. |

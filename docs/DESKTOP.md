@@ -8,6 +8,15 @@ Settings → General offers dark, light and system appearance. Changes save afte
 pause, through the authenticated API. Failed saves show an inline retry instruction.
 Settings → Metasploit contains connection setup. The first-launch guide can be dismissed.
 
+**Settings → General → Check for updates** checks the latest stable release on demand,
+even when startup checks are disabled. A successful check with no newer release displays
+**You are up to date**. A newer Windows release offers **Update to vX.X.X**, which downloads
+and verifies the installer through the existing updater. **Install & restart** still requires
+a separate click after verification. Failed checks show a retry message; they never report
+that the application is current. A manual check resurfaces a previously dismissed release.
+This does not enable automatic startup checks. Other platforms retain release notification
+and the release-page link.
+
 Shortcuts: **Ctrl+K** opens a searchable page palette; **Ctrl+T** opens Modules;
 **Ctrl+L** opens Sessions / Jobs / Console; **Ctrl+S** saves the active workspace's notes;
 **F5** refreshes session/job lists. Terminal commands are never silently retried.
@@ -16,11 +25,12 @@ Update checks are optional and initially disabled. When enabled, startup perform
 background request to the public GitHub latest-release endpoint, using verified TLS,
 no proxies or redirects, a five-second total deadline, a 64 KiB response cap and ETags.
 Only newer stable versions produce a dismissible banner. Offline, missing releases and
-rate limits stay quiet. Disabling checks cancels an in-flight check. Polling behavior is unchanged.
+rate limits stay quiet during startup checks. Disabling startup checks cancels an in-flight
+startup check. Polling behavior is unchanged.
 
 ## Windows: download, verify, install and restart
 
-Settings → General shows **Download update** when a newer stable release publishes
+Settings → General shows **Update to vX.X.X** when a newer stable release publishes
 its Windows setup executable, SHA256SUMS and both corresponding `.sigstore.json`
 bundles. Downloads start only on your click. A themed progress bar shows the current
 stage; checksum/signature badges must pass before **Install & restart** is enabled.

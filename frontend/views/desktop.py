@@ -46,6 +46,8 @@ class DesktopControls(QWidget):
         self.notice = UpdateNotice()
         self.update_progress = UpdateProgress()
         self.owns_backend = True
+        self.checking_updates = False
+        self.manual_notice_version = ""
         root = QVBoxLayout(self)
         row = QHBoxLayout()
         row.addWidget(QLabel("Workspace"))
@@ -130,6 +132,15 @@ class DesktopControls(QWidget):
         form.addWidget(self.theme)
         self.updates = QCheckBox("Check GitHub for updates on startup (no downloads)")
         form.addWidget(self.updates)
+        self.check_button = QPushButton("Check for updates")
+        self.check_button.setToolTip("Check GitHub for the latest stable release now.")
+        self.check_button.clicked.connect(self.check_updates)
+        form.addWidget(self.check_button)
+        self.check_status = StatusBadge("")
+        self.check_status.setTextFormat(Qt.TextFormat.PlainText)
+        self.check_status.setAccessibleName("Update check result")
+        self.check_status.hide()
+        form.addWidget(self.check_status)
         form.addWidget(self.banner)
         self.message = StatusBadge("Loading settings…")
         self.message.setTextFormat(Qt.TextFormat.PlainText)
@@ -199,6 +210,7 @@ class DesktopControls(QWidget):
 
     def dismiss_update(self) -> None:
         if self.settings:
+            self.manual_notice_version = ""
             self.settings.dismissed_version = self.notice.version
             self.banner.hide()
             self.debounce.start()
@@ -225,7 +237,8 @@ class DesktopControls(QWidget):
             )
             self.vm.vault_request("vault-indicator", "GET", "status", VaultStatus)
         self.vm.get("connection-status", "/api/v1/connection", ConnectionStatus)
-        self.vm.get("updates", "/api/v1/updates", UpdateNotice)
+        if not self.checking_updates:
+            self.vm.get("updates", "/api/v1/updates", UpdateNotice)
         self.vm.get("update-progress", "/api/v1/updates/progress", UpdateProgress)
 
     def update_state(self, key: str, value: object) -> None:
@@ -267,13 +280,32 @@ class DesktopControls(QWidget):
                 f"{value.targets} targets · {value.recorded_sessions} recorded sessions · "
                 f"{value.running_jobs} local jobs · {value.saved_reports} reports"
             )
-        elif key == "updates" and isinstance(value, UpdateNotice):
+        elif key in {"updates", "updates-check"} and isinstance(value, UpdateNotice):
+            manual = key == "updates-check"
+            if not manual and self.checking_updates:
+                return
+            if manual:
+                self.vm.invalidate("updates")
+                self.checking_updates = False
+                self.manual_notice_version = value.version
+                self.check_status.set_status(
+                    (
+                        f"Update to v{value.version.removeprefix('v')} is available"
+                        if value.version
+                        else "You are up to date"
+                    ),
+                    "ready" if value.version else "done",
+                )
+                self.check_status.show()
             self.notice = value
             self.update_text.setText(f"Toolkit {value.version} is available.")
             self.render_update()
             self.banner.setVisible(
                 bool(value.version)
-                and bool(self.settings and self.settings.dismissed_version != value.version)
+                and (
+                    self.manual_notice_version == value.version
+                    or bool(self.settings and self.settings.dismissed_version != value.version)
+                )
             )
         elif key in {"update-progress", "update-download", "update-apply"} and isinstance(
             value, UpdateProgress
@@ -292,8 +324,19 @@ class DesktopControls(QWidget):
             unlocked = isinstance(value, VaultStatus) and value.unlocked
             self.status.setText(f"{state} · Vault {'unlocked' if unlocked else 'locked'}")
 
+    def check_updates(self) -> None:
+        if not self.check_button.isEnabled():
+            return
+        self.checking_updates = True
+        self.vm.invalidate("updates")
+        self.check_button.setEnabled(False)
+        self.check_status.setText("Checking for updates…")
+        self.check_status.show()
+        self.vm.get("updates-check", "/api/v1/updates/check", UpdateNotice)
+
     def download_update(self) -> None:
         self.download_button.setEnabled(False)
+        self.check_button.setEnabled(False)
         self.vm.mutate(
             "update-download",
             "POST",
@@ -306,6 +349,7 @@ class DesktopControls(QWidget):
         state = self.update_progress
         windows = sys.platform == "win32"
         busy = state.phase in {"downloading", "verifying", "preparing", "prepared"}
+        self.check_button.setEnabled(not busy and not self.checking_updates)
         verified = (
             state.version == self.notice.version
             and state.phase == "verified"
@@ -319,7 +363,13 @@ class DesktopControls(QWidget):
             bool(self.notice.installer_url) and not busy and not verified
         )
         self.download_button.setText(
-            "Retry download" if state.phase == "failed" else "Download update"
+            "Retry download"
+            if state.phase == "failed"
+            else (
+                f"Update to v{self.notice.version.removeprefix('v')}"
+                if self.notice.version
+                else "Download update"
+            )
         )
         self.install_button.setEnabled(verified and state.can_apply and self.owns_backend)
         self.install_button.setProperty(
@@ -350,6 +400,11 @@ class DesktopControls(QWidget):
                 style.polish(widget)
 
     def error(self, key: str, message: str) -> None:
+        if key == "updates-check":
+            self.checking_updates = False
+            self.check_status.setText("Update check failed. Click Check for updates to retry.")
+            self.check_status.show()
+            self.render_update()
         if key in {"update-download", "update-apply"}:
             self.update_progress = self.update_progress.model_copy(
                 update={"phase": "failed", "message": "Update failed. Retry download."}

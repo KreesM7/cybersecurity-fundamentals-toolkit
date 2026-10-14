@@ -32,7 +32,9 @@ class DesktopService:
         self.notice = UpdateNotice()
         self.etag = ""
         self._lock = asyncio.Lock()
-        self._task: asyncio.Task[None] | None = None
+        self._check_lock = asyncio.Lock()
+        self._manual_notice = False
+        self._task: asyncio.Task[bool] | None = None
 
     async def start(self) -> None:
         if self.path.exists():
@@ -88,16 +90,30 @@ class DesktopService:
         return self.settings.model_copy()
 
     def visible_notice(self) -> UpdateNotice:
-        if (
+        if not self._manual_notice and (
             not self.settings.check_updates
             or self.settings.dismissed_version == self.notice.version
         ):
             return UpdateNotice()
         return self.notice.model_copy()
 
-    async def check(self, transport: httpx.AsyncBaseTransport | None = None) -> None:
-        if not self.settings.check_updates:
-            return
+    async def check_now(self, transport: httpx.AsyncBaseTransport | None = None) -> UpdateNotice:
+        if not await self.check(transport, manual=True):
+            raise ValueError("Unable to check for updates. Try again.")
+        self._manual_notice = True
+        return self.notice.model_copy()
+
+    async def check(
+        self, transport: httpx.AsyncBaseTransport | None = None, *, manual: bool = False
+    ) -> bool:
+        async with self._check_lock:
+            return await self._check_release(transport, manual=manual)
+
+    async def _check_release(
+        self, transport: httpx.AsyncBaseTransport | None, *, manual: bool
+    ) -> bool:
+        if not manual and not self.settings.check_updates:
+            return False
         try:
             async with asyncio.timeout(5):
                 headers = {
@@ -114,27 +130,29 @@ class DesktopService:
                     transport=transport,
                 ) as client:
                     async with client.stream("GET", RELEASE_API, headers=headers) as response:
+                        if response.status_code == 304:
+                            return bool(self.etag)
                         if response.status_code != 200:
-                            return
+                            return False
                         body = bytearray()
                         async for chunk in response.aiter_bytes():
                             body.extend(chunk)
                             if len(body) > 65536:
-                                return
+                                return False
                         result = json.loads(body)
                         if (
                             not isinstance(result, dict)
                             or result.get("draft") is not False
                             or result.get("prerelease") is not False
                         ):
-                            return
+                            return False
                         tag = result.get("tag_name", "")
                         version = stable_version(tag) if isinstance(tag, str) else None
                         if not version:
-                            return
+                            return False
                         async with self._lock:
-                            if not self.settings.check_updates:
-                                return
+                            if not manual and not self.settings.check_updates:
+                                return False
                             self.notice = (
                                 release_notice(tag, result)
                                 if version > CURRENT_VERSION
@@ -142,8 +160,9 @@ class DesktopService:
                             )
                             self.etag = response.headers.get("etag", "")[:512]
                             await self._save()
+                        return True
         except (httpx.HTTPError, TimeoutError, ValueError, OSError):
-            pass  # Offline, malformed, rate limited and absent releases remain quiet.
+            return False  # Startup checks remain quiet; manual checks display a retry message.
 
     async def download_update(self, version: str) -> UpdateProgress:
         if version != self.visible_notice().version:

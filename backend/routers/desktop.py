@@ -45,6 +45,11 @@ async def updates(request: Request) -> UpdateNotice:
     return cast(DesktopService, request.app.state.desktop).visible_notice()
 
 
+@router.get("/updates/check", response_model=UpdateNotice)
+async def check_updates(request: Request) -> UpdateNotice:
+    return await cast(DesktopService, request.app.state.desktop).check_now()
+
+
 @router.get("/dashboard", response_model=DashboardSummary)
 async def dashboard(request: Request, workspace_id: UUID) -> DashboardSummary:
     service = cast(WorkspaceService, request.app.state.workspaces)

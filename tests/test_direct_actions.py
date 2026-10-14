@@ -53,3 +53,43 @@ def test_action_panels_have_no_ownership_checkbox():
         for panel in panels:
             panel.deleteLater()
         app.processEvents()
+
+
+def test_companion_operation_does_not_require_acknowledgment():
+    from toolkit.secdesk.companion import CompanionTransport
+
+    class Adapter:
+        vendor_id = 1
+        product_id = 2
+        baud_rate = 9600
+        capabilities = frozenset({"read"})
+
+        def encode(self, operation: str, payload: bytes) -> bytes:
+            return b"read:" + payload
+
+        def decode(self, payload: bytes) -> bytes:
+            return payload
+
+    class Serial:
+        def __init__(self):
+            self.writes = []
+
+        def write(self, payload):
+            self.writes.append(payload)
+            return len(payload)
+
+        def read(self, size):
+            return b"result"
+
+    import pytest
+
+    transport = CompanionTransport(Adapter())
+    serial = Serial()
+    transport._serial = serial
+    assert transport.exchange("read", b"fixture") == b"result"
+    assert transport.exchange("read", b"legacy", authorized=False) == b"result"
+    with pytest.raises(ValueError, match="firmware-supported"):
+        transport.exchange("unsupported", b"")
+    with pytest.raises(ValueError, match="payload exceeds"):
+        transport.exchange("read", b"x" * 65537)
+    assert serial.writes == [b"read:fixture", b"read:legacy"]

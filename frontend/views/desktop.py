@@ -62,7 +62,7 @@ class DesktopControls(QWidget):
         welcome = QLabel(
             "Start with the seven fundamentals tools. Saved captures work offline.\n"
             "Use Workspaces to organize targets and notes. Set up Toolkit-MSF before\n"
-            "connecting in Settings. Test only systems you own or are permitted to assess.\n"
+            "connecting in Settings.\n"
             "Ctrl+K: find a page · Ctrl+T: modules · Ctrl+L: console · "
             "Ctrl+S: save notes · F5: sessions"
         )
@@ -137,6 +137,14 @@ class DesktopControls(QWidget):
         retry = QPushButton("Retry loading settings")
         retry.clicked.connect(self.load)
         form.addWidget(retry)
+        legal = QLabel(
+            "Legal disclaimer: You are responsible for applicable laws, required permissions, "
+            "and tool licenses. Testing and commands may affect systems or data. "
+            "Software is provided without warranty under the MIT license."
+        )
+        legal.setWordWrap(True)
+        legal.setAccessibleName("Legal disclaimer")
+        form.addWidget(legal)
         form.addStretch()
         self.settings_panel.addTab(general, "General")
         self.settings_panel.addTab(ConnectionPanel(vm), "Metasploit")

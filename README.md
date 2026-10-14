@@ -4,6 +4,8 @@
 
 One native desktop application with seven fundamentals tools, local workspaces, Metasploit integration, an encrypted credential vault, and reports. Python 3.11/3.12, PyQt6, and a private authenticated HTTPS/WSS backend run in one desktop process. Errors remain local; no telemetry is enabled.
 
+[Legal disclaimer](DISCLAIMER.md). Tools run from explicit actions without ownership acknowledgments. Credential encryption, authenticated connections, and installer verification remain enabled.
+
 **Quick start:** install the unsigned Windows x64 package from [Releases](https://github.com/KreesM7/cybersecurity-fundamentals-toolkit/releases), then open **Cybersecurity Fundamentals Toolkit** from Start. Python is included. Alternatively, extract the entire portable ZIP and run its executable. The Linux AppImage targets Ubuntu 24.04+ x86_64. Nmap, libmagic, and Toolkit-MSF are separate optional prerequisites; setup messages identify affected tools.
 
 ![Toolkit dashboard](docs/screenshots/dashboard-dark.png)

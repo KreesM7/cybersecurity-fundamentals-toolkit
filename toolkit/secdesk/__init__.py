@@ -1,1 +1,1 @@
-"""Manifest-driven local tool education and explicitly authorized launching."""
+"""Manifest-driven local tool education and user-initiated launching."""

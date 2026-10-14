@@ -65,10 +65,11 @@ class CompanionTransport:
         self._serial = module.Serial(device, self.adapter.baud_rate, timeout=1, write_timeout=1)
 
     def exchange(self, operation: str, payload: bytes, *, authorized: bool = False) -> bytes:
+        # Retain the legacy argument for callers; operation support comes from the firmware.
         if self.adapter is None or self._serial is None:
             raise ValueError("No protocol-backed device connection")
-        if authorized is not True or operation not in self.adapter.capabilities:
-            raise ValueError("Explicit authorization and a firmware-supported operation required")
+        if operation not in self.adapter.capabilities:
+            raise ValueError("A firmware-supported operation is required")
         if len(payload) > 65536:
             raise ValueError("Device payload exceeds limit")
         command = self.adapter.encode(operation, payload)

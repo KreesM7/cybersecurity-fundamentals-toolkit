@@ -19,10 +19,12 @@ from backend.update_handoff import consume_update_message, launch_pending_update
 from frontend.icons import app_icon
 from frontend.main_window import MainWindow
 from frontend.runtime import BackendThread, finish_backend
+from frontend.startup import StartupUpdateGate
 from frontend.theme import SIZE, apply_theme
 from frontend.viewmodels.app_vm import AppViewModel
 from frontend.views.secdesk import SecDeskPanel
 from frontend.views.tools.base import ToolPanel
+from shared.desktop import StartupUpdateResult
 from shared.version import VERSION
 
 
@@ -40,14 +42,24 @@ def main(argv: list[str] | None = None) -> int:
     application.setApplicationName("Cybersecurity Fundamentals Toolkit")
     apply_theme(application, "dark")
     application.setWindowIcon(app_icon())
-    launcher = QLabel("Starting the authenticated local backend…")
+    launcher = QLabel("Starting Toolkit…")
     launcher.setWindowTitle("Cybersecurity Fundamentals Toolkit")
     launcher.resize(SIZE["launcher_w"], SIZE["launcher_h"])
     launcher.show()
     backend = BackendThread(profile)
     windows: list[MainWindow] = []
     models: list[AppViewModel] = []
+    gates: list[StartupUpdateGate] = []
     result = 0
+    quitting = False
+
+    def closing() -> None:
+        nonlocal quitting
+        quitting = True
+        for gate in gates:
+            gate.cancel()
+
+    application.aboutToQuit.connect(closing)
 
     def failed(message: str) -> None:
         nonlocal result
@@ -61,6 +73,8 @@ def main(argv: list[str] | None = None) -> int:
             application.exit(result)
 
     def ready(locator: object, material: object, owned: bool) -> None:
+        if quitting:
+            return
         if not isinstance(locator, InstanceLocator) or not isinstance(material, TLSMaterial):
             failed("Invalid backend startup result. Restart the application.")
             return
@@ -69,13 +83,41 @@ def main(argv: list[str] | None = None) -> int:
             material.client_context(),
             locator.token.get_secret_value(),
         )
+        models.append(model)
+        if args.self_test:
+            open_window(model, owned, StartupUpdateResult(state="disabled"))
+        else:
+            gate = StartupUpdateGate(model, launcher)
+            gates.append(gate)
+            gate.finished.connect(lambda value: open_window(model, owned, value))
+            gate.start()
+
+    def open_window(model: AppViewModel, owned: bool, startup: StartupUpdateResult) -> None:
+        if quitting:
+            return
         window = MainWindow(model)
         window.desktop_controls.owns_backend = owned
         message = consume_update_message(profile, VERSION) if owned else ""
         notification = window.statusBar()
-        if message and notification is not None:
-            notification.showMessage(message, 12000)
-        models.append(model)
+        update_message = (
+            f"Update to {startup.notice.version} is available in Settings"
+            if startup.state == "checked" and startup.notice.version
+            else (
+                "You are up to date"
+                if startup.state == "checked"
+                else (
+                    "Could not check for updates. Retry in Settings."
+                    if startup.state == "failed"
+                    else ""
+                )
+            )
+        )
+        if notification is not None and (message or update_message):
+            notification.showMessage(
+                " · ".join(value for value in (message, update_message) if value), 12000
+            )
+        if startup.state == "checked":
+            window.desktop_controls.update_state("updates", startup.notice)
         windows.append(window)
         launcher.hide()
         window.show()

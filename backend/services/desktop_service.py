@@ -10,7 +10,7 @@ import httpx
 from backend.events import EventHub
 from backend.platform_utils import assert_private_path, atomic_private_write
 from backend.services.update_service import UpdateService, release_notice
-from shared.desktop import DesktopSettings, UpdateNotice, UpdateProgress
+from shared.desktop import DesktopSettings, StartupUpdateResult, UpdateNotice, UpdateProgress
 from shared.version import CURRENT_VERSION, VERSION
 
 REPOSITORY = "KreesM7/cybersecurity-fundamentals-toolkit"
@@ -102,6 +102,28 @@ class DesktopService:
             raise ValueError("Unable to check for updates. Try again.")
         self._manual_notice = True
         return self.notice.model_copy()
+
+    async def startup_check(self) -> StartupUpdateResult:
+        """Wait for the existing startup request without issuing a second release GET."""
+        if not self.settings.check_updates:
+            return StartupUpdateResult(state="disabled")
+        if self._task is None:
+            self.schedule_check()
+        task = self._task
+        if task is None:
+            return StartupUpdateResult(state="disabled")
+        try:
+            checked = await asyncio.shield(task)
+        except asyncio.CancelledError:
+            if not task.cancelled():
+                raise
+            checked = False
+        if not self.settings.check_updates:
+            return StartupUpdateResult(state="disabled")
+        return StartupUpdateResult(
+            state="checked" if checked else "failed",
+            notice=self.notice.model_copy() if checked else UpdateNotice(),
+        )
 
     async def check(
         self, transport: httpx.AsyncBaseTransport | None = None, *, manual: bool = False

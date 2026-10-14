@@ -24,9 +24,10 @@ Shortcuts: **Ctrl+K** opens a searchable page palette; **Ctrl+T** opens Modules;
 Update checks are optional and initially disabled. When enabled, startup performs one
 background request to the public GitHub latest-release endpoint, using verified TLS,
 no proxies or redirects, a five-second total deadline, a 64 KiB response cap and ETags.
-Only newer stable versions produce a dismissible banner. Offline, missing releases and
-rate limits stay quiet during startup checks. Disabling startup checks cancels an in-flight
-startup check. Polling behavior is unchanged.
+Only newer stable versions produce a dismissible banner. The launcher waits before
+opening the main window; offline, missing releases and rate limits produce a retry
+notification without blocking use. Disabling startup checks cancels an in-flight
+startup check. Release-request bounds and polling behavior are unchanged.
 
 ## Windows: download, verify, install and restart
 
@@ -82,6 +83,17 @@ refusal on checksum/signature failures. They never run a downloaded installer.
 
 
 ## SecDesk source candidate (2.2.0)
+
+Normal launches show **Checking for updates…** before creating the main window.
+The existing Settings startup-update preference controls the GitHub request.
+The launcher waits for the backend's existing release check, preserving its
+TLS verification, ETag, five-second deadline and 64 KiB response cap; it does
+not issue a second release request. A seven-second UI fallback opens the app
+with a retry message if the local request stalls. Offline use remains available.
+Successful checks show **You are up to date** or an update notice in Settings.
+Downloads and verified installation still require explicit clicks. Closing the
+launcher cancels its callbacks, preventing a late response reopening the app.
+The default disposable `--self-test` remains deterministic and skips this UI wait.
 
 Open SecDesk from the Tools navigation. Startup checks are passive and local: executable presence, dependency discovery and serial metadata. They do not start services, open serial connections, run captures or probe endpoints. Unknown services/permissions/licenses are displayed with Setup guidance. Recheck repeats only those passive checks.
 

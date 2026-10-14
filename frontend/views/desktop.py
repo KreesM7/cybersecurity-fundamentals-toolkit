@@ -132,7 +132,7 @@ class DesktopControls(QWidget):
         self.theme = QComboBox()
         self.theme.addItems(["dark", "light", "system"])
         form.addWidget(self.theme)
-        self.updates = QCheckBox("Check GitHub for updates on startup (no downloads)")
+        self.updates = QCheckBox("Check GitHub for updates before opening the app (no downloads)")
         form.addWidget(self.updates)
         self.check_button = QPushButton("Check for updates")
         self.check_button.setToolTip("Check GitHub for the latest stable release now.")

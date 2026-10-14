@@ -26,6 +26,11 @@ class UpdateNotice(SchemaModel):
     checksums_signature_url: str = ""
 
 
+class StartupUpdateResult(SchemaModel):
+    state: Literal["checked", "disabled", "failed"]
+    notice: UpdateNotice = Field(default_factory=UpdateNotice)
+
+
 class UpdateRequest(SchemaModel):
     version: str = Field(max_length=32)
 

@@ -12,6 +12,7 @@ from backend.services.workspace_service import WorkspaceService
 from shared.desktop import (
     DashboardSummary,
     DesktopSettings,
+    StartupUpdateResult,
     UpdateNotice,
     UpdateProgress,
     UpdateRequest,
@@ -48,6 +49,11 @@ async def updates(request: Request) -> UpdateNotice:
 @router.get("/updates/check", response_model=UpdateNotice)
 async def check_updates(request: Request) -> UpdateNotice:
     return await cast(DesktopService, request.app.state.desktop).check_now()
+
+
+@router.get("/updates/startup", response_model=StartupUpdateResult)
+async def startup_updates(request: Request) -> StartupUpdateResult:
+    return await cast(DesktopService, request.app.state.desktop).startup_check()
 
 
 @router.get("/dashboard", response_model=DashboardSummary)

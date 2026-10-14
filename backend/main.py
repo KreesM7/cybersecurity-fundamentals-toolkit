@@ -30,6 +30,7 @@ from backend.routers import (
     activity,
     connection,
     desktop,
+    lowrea,
     modules,
     payloads,
     reports,
@@ -173,6 +174,7 @@ def create_app(
     app.include_router(workspaces.router, prefix="/api/v1")
     app.include_router(targets.router, prefix="/api/v1")
     app.include_router(tools.router, prefix="/api/v1")
+    app.include_router(lowrea.router, prefix="/api/v1")
     app.include_router(connection.router, prefix="/api/v1")
     app.include_router(modules.router, prefix="/api/v1")
     app.include_router(payloads.router, prefix="/api/v1")

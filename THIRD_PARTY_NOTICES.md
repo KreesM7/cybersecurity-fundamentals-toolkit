@@ -35,3 +35,10 @@ Checksum source: https://github.com/sigstore/cosign/releases/download/v3.1.3/cos
 
 
 SecDesk adds pywinpty 3.0.5 (MIT), pyserial 3.5 (BSD), and pyte 0.8.2 (LGPL-3.0); exact upstream license/source files must be included in each release inventory. The host POSIX `script` executable and vendor security tools are detected/used externally and are not bundled. Our added source remains MIT. New binary distribution requires refreshed inventory/notices and the existing dependency-license release gate; source verification alone does not establish binary redistribution clearance. The existing external Scapy/GPL-2.0-only and python-nmap/GPL-3.0 concerns remain documented.
+
+LowREA adds Capstone 5.0.9 (BSD-3-Clause core, with upstream third-party notices)
+and the official MCP Python SDK 2.3.0 (MIT). The Capstone dynamic library is
+collected into rebuilt desktop folders. MCP's locked transitive dependencies keep
+their own license terms; generated release inventories include packages actually
+collected, their original notices, versions and source hashes. Upstream sources:
+https://github.com/capstone-engine/capstone and https://github.com/modelcontextprotocol/python-sdk .

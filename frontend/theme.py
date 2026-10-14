@@ -15,7 +15,7 @@ SIZE = {
     "sidebar": 244,
     "collapsed": 64,
     "icon": 18,
-    "control": 32,
+    "control": 36,
     "description": 96,
     "output": 144,
     "side_list": 220,
@@ -25,7 +25,7 @@ SIZE = {
     "launcher_w": 600,
     "launcher_h": 120,
 }
-STYLE = {"font": 13, "title": 22, "small": 12, "line": 1, "focus": 2, "radius": 0}
+STYLE = {"font": 14, "title": 24, "small": 12, "line": 1, "focus": 2, "radius": 0}
 
 
 @dataclass(frozen=True)

@@ -70,8 +70,20 @@ class GuiTests(unittest.TestCase):
         for index in range(1, 8):
             self.window.stack.setCurrentWidget(list(self.window.panels.values())[index - 1])
             self.assertIsInstance(self.window.stack.currentWidget(), ToolPanel)
-        self.wait_until(lambda: "Caesar Cipher" in self.window.readiness_label.text())
-        self.assertIn("Password Strength", self.window.readiness_label.text())
+        self.wait_until(lambda: self.window.tool_table.topLevelItemCount() == 7)
+        names = {self.window.tool_table.topLevelItem(index).text(0) for index in range(7)}
+        self.assertIn("Caesar Cipher", names)
+        self.assertIn("Password Strength", names)
+        self.assertIn("Fundamentals", self.window.readiness_label.text())
+        for index in range(7):
+            row = self.window.tool_table.topLevelItem(index)
+            actions = self.window.tool_table.itemWidget(row, 3)
+            from PyQt6.QtWidgets import QPushButton
+
+            self.assertEqual(
+                [button.text() for button in actions.findChildren(QPushButton)],
+                ["Open GUI", "Open in Terminal"],
+            )
 
     def test_fundamentals_terminal_runs_real_cipher_password_and_file_jobs(self):
         import json

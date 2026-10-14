@@ -35,8 +35,41 @@ def main(arguments: list[str] | None = None) -> int:
         "inventory-artifact", help="Record byte identity without execution"
     )
     inventory.add_argument("path", type=Path)
+    inspect = commands.add_parser("inspect", help="Inspect headers and a static instruction window")
+    inspect.add_argument("path", type=Path)
+    inspect.add_argument(
+        "--architecture", choices=("auto", "x86", "x86-64", "arm64"), default="auto"
+    )
+    inspect.add_argument("--offset", type=lambda value: int(value, 0), default=None)
+    inspect.add_argument("--length", type=int, default=256)
+    inspect.add_argument("--endian", choices=("little", "big"), default="little")
+    inspect.add_argument("--base-address", type=lambda value: int(value, 0), default=0)
+    commands.add_parser("serve", help="Run the official-SDK MCP stdio server")
     args = parser.parse_args(arguments)
+    if args.command == "serve":
+        from toolkit.lowrea.mcp_server import main as serve
+
+        serve()
+        return 0
     try:
+        if args.command == "inspect":
+            from shared.lowrea import LowreaOptions
+            from toolkit.lowrea.files import inspect_path
+
+            evidence = inspect_path(
+                args.path,
+                LowreaOptions.model_validate(
+                    {
+                        "architecture": args.architecture,
+                        "offset": args.offset,
+                        "length": args.length,
+                        "endian": args.endian,
+                        "base_address": args.base_address,
+                    }
+                ),
+            )
+            print(json.dumps({"isError": False, "evidence": evidence.record()}))
+            return 0
         descriptor = os.open(args.path, os.O_RDONLY | getattr(os, "O_NONBLOCK", 0))
         try:
             if not stat.S_ISREG(os.fstat(descriptor).st_mode):

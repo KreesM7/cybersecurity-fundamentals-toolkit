@@ -1,0 +1,17 @@
+{
+  "profile": "product-admin",
+  "sourceRoots": ["frontend"],
+  "canonicalMap": "UX-CONTRACT.md",
+  "requiredCapabilities": ["Table Selection", "Select/Listbox", "Form", "Scrollbar", "Toast", "CRUD"],
+  "requiredCommands": ["tests", "lint", "types"],
+  "commands": {
+    "tests": "python -m pytest --cov --cov-report=term -q",
+    "lint": "python -m ruff check backend frontend shared toolkit tests scripts",
+    "types": "python -m mypy backend frontend shared toolkit"
+  },
+  "evidence": {
+    "crudFullFlow": "tests/v2/test_workspaces.py",
+    "failurePaths": "tests/test_lowrea_static.py"
+  },
+  "nativeNote": "PyQt6 widgets are canonical; the web static audit checks ownership documents. Native runtime, accessibility and layout require the Qt tests and screenshots."
+}

@@ -403,7 +403,9 @@ def test_qt_worker_keeps_ui_responsive_delivers_on_gui_and_shuts_down(tmp_path: 
         QTest.qWait(10)
     assert received == [app.thread()]
     assert len(ticks) >= 3
-    assert "live" in window.health_label.text()
+    assert vm.health is not None and vm.health.instance_id == "live"
+    assert "Backend ready" in window.health_label.text()
+    assert "v2.2.0" in window.health_label.text()
     timer.stop()
     from PyQt6.QtWidgets import QLabel
 

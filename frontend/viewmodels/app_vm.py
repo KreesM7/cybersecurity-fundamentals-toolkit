@@ -10,6 +10,7 @@ from pydantic import BaseModel, RootModel, SecretStr
 from PyQt6.QtCore import QObject, pyqtSignal
 
 from frontend.viewmodels.tools_vm import ToolsViewModel
+from shared.lowrea import LowreaOptions
 from shared.modules import (
     FavoriteChange,
     ModuleDetail,
@@ -221,6 +222,15 @@ class AppViewModel(ToolsViewModel):
 
     def launch_module(self, value: ModuleRun) -> None:
         self.mutate("module-launch", "POST", "/api/v1/modules/run", ModuleLaunch, value)
+
+    def inspect_lowrea(self, options: LowreaOptions, filename: str) -> UUID:
+        from shared.tools import ToolJob
+
+        self.clear("lowrea")
+        scoped = options.model_copy(update={"workspace_id": self.workspace_id})
+        identifier = self.run_upload("/api/v1/lowrea/inspect", ToolJob, scoped, filename)
+        self._pending[identifier] = ("submit", "lowrea", self._generation.get("lowrea", 0))
+        return identifier
 
     def targets(self) -> None:
         if self.workspace_id:

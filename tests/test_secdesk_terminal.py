@@ -128,10 +128,12 @@ def test_owned_gui_cleans_descendants_after_launcher_exit(tmp_path, parent_exits
     from toolkit.secdesk.gui_process import NativeGUI
 
     child_file = tmp_path / "child.pid"
+    staged_file = tmp_path / "child.pid.partial"
     script = (
         "import subprocess,sys,time,pathlib; "
         "p=subprocess.Popen([sys.executable,'-c','import time; time.sleep(60)']); "
-        f"pathlib.Path({str(child_file)!r}).write_text(str(p.pid)); "
+        f"pathlib.Path({str(staged_file)!r}).write_text(str(p.pid)); "
+        f"pathlib.Path({str(staged_file)!r}).replace({str(child_file)!r}); "
         + ("" if parent_exits else "time.sleep(60)")
     )
     process = NativeGUI([sys.executable, "-c", script], tmp_path)

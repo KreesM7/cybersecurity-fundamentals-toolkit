@@ -188,14 +188,22 @@ Regenerate them with `python scripts/capture_ui.py`; regenerate app icon exports
 `python scripts/render_app_icon.py`. The original Toolkit Line SVG glyphs share a 2-unit
 stroke and are licensed with the application under MIT.
 
-## LowREA (source checkout; implementation in progress)
+## LowREA
 
-`python -m toolkit lowrea inventory-artifact PATH` records a local file's byte
-identity without executing it. It returns JSON evidence or a diagnostic with a
-remediation and exits 0 or 1 respectively. No external analysis engine is required
-for this operation. This is not a disassembler or the completed LowREA suite.
-See [LowREA status](docs/lowrea/STATUS.md) and [integration design](docs/lowrea/DESIGN.md).
-The published v2.1.0 installers do not include LowREA.
+Open **LowREA** from Tools or the dashboard. Choose a file, then **Inspect file**
+to view SHA-256, PE/ELF mappings, decoded instructions, hex bytes and limited
+RIP-relative references. Raw files support caller-selected x86, x86-64 or ARM64.
+Previous/Next navigate byte windows; **Export evidence** saves the result on request.
+Inspection runs in background jobs with cancellation.
+
+The same producer is available through `python -m toolkit lowrea inspect PATH`
+and the official-SDK MCP stdio server, `python -m toolkit lowrea serve`.
+`inventory-artifact PATH` retains streaming identity for larger files.
+See [operation and limits](docs/lowrea/OPERATIONS.md),
+[status](docs/lowrea/STATUS.md) and [integration design](docs/lowrea/DESIGN.md).
+This is static window inspection, not full function recovery, decompilation or
+runtime analysis. Published v2.1.0 installers do not include these changes;
+run the updated source or rebuilt desktop folder.
 
 
 ## SecDesk source integration

@@ -70,6 +70,7 @@ class DesktopControls(QWidget):
         )
         welcome.setWordWrap(True)
         welcome_layout.addWidget(welcome)
+        steps = QHBoxLayout()
         for title, destination in (
             ("1 · Create workspace", "Workspaces"),
             ("2 · Add target", "Targets"),
@@ -79,10 +80,11 @@ class DesktopControls(QWidget):
             step.clicked.connect(
                 lambda checked=False, page=destination: self.navigate_requested.emit(page)
             )
-            welcome_layout.addWidget(step)
+            steps.addWidget(step)
         done = QPushButton("Got it")
         done.clicked.connect(self.finish_onboarding)
-        welcome_layout.addWidget(done)
+        steps.addWidget(done)
+        welcome_layout.addLayout(steps)
         root.addWidget(self.welcome)
         self.banner = QWidget()
         banner_layout = QVBoxLayout(self.banner)

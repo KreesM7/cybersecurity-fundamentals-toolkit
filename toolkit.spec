@@ -3,7 +3,7 @@ from pathlib import Path
 import os
 import sys
 import hashlib
-from PyInstaller.utils.hooks import collect_data_files, collect_submodules
+from PyInstaller.utils.hooks import collect_data_files, collect_dynamic_libs, collect_submodules
 
 root = Path(SPECPATH)
 sys.path.insert(0, str(root))
@@ -29,9 +29,10 @@ datas = (collect_data_files('toolkit.resources')
 analysis = Analysis(
     [str(root / 'toolkit' / '__main__.py')],
     pathex=[str(root)],
-    binaries=[],
+    binaries=collect_dynamic_libs('capstone'),
     datas=datas,
     hiddenimports=(collect_submodules('toolkit.modules') + collect_submodules('backend.tools')
+                   + collect_submodules('capstone')
                    + collect_submodules('frontend.views')
                    + ['sqlalchemy.dialects.sqlite.aiosqlite',
                       'keyring.backends.Windows' if sys.platform == 'win32' else 'keyring.backends.SecretService',

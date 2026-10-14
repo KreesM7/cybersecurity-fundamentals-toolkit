@@ -14,7 +14,7 @@ TITLE_ROLE = Qt.ItemDataRole.UserRole + 1
 ICON_ROLE = Qt.ItemDataRole.UserRole + 2
 GROUPS = (
     ("WORKSPACE", ("Dashboard", "Workspaces", "Targets")),
-    ("TOOLS", ("SecDesk",)),
+    ("TOOLS", ("SecDesk", "LowREA")),
     ("OFFENSIVE", ("Modules", "Payloads", "Sessions & Jobs")),
     ("FUNDAMENTALS", tuple(title for _, title in PANELS)),
     ("DATA", ("Artifacts", "Reports", "Vault")),
@@ -64,6 +64,7 @@ ICONS = dict(
 )
 
 ICONS["SecDesk"] = "modules"
+ICONS["LowREA"] = "file"
 
 
 class Navigation(QWidget):

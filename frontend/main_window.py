@@ -14,6 +14,8 @@ from PyQt6.QtWidgets import (
     QMessageBox,
     QPushButton,
     QStackedWidget,
+    QTreeWidget,
+    QTreeWidgetItem,
     QVBoxLayout,
     QWidget,
 )
@@ -26,6 +28,7 @@ from frontend.viewmodels.base_vm import BaseViewModel
 from frontend.viewmodels.tools_vm import ToolsViewModel
 from frontend.views.activity import ActivityPanel
 from frontend.views.desktop import DesktopControls
+from frontend.views.lowrea import LowreaPanel
 from frontend.views.modules import ModuleBrowser
 from frontend.views.payloads import PayloadPanel
 from frontend.views.reports import ReportsPanel
@@ -62,7 +65,7 @@ class MainWindow(QMainWindow):
         self.stack = QStackedWidget()
         dashboard = QWidget()
         content = QVBoxLayout(dashboard)
-        page_title = QLabel("Toolkit dashboard")
+        page_title = QLabel("Workspace overview")
         page_title.setObjectName("pageTitle")
         self.health_label = QLabel("Backend health has not been checked.")
         self.health_label.setWordWrap(True)
@@ -71,13 +74,38 @@ class MainWindow(QMainWindow):
         refresh = QPushButton("Refresh health")
         refresh.clicked.connect(view_model.refresh_health)
         content.addWidget(page_title)
+        introduction = QLabel(
+            "Fundamentals, external tools and binary inspection in one workspace."
+        )
+        introduction.setWordWrap(True)
+        content.addWidget(introduction)
         content.addWidget(self.health_label)
         content.addWidget(self.error_label)
         self.readiness_label = QLabel("Tool readiness has not been checked.")
         self.readiness_label.setWordWrap(True)
         content.addWidget(self.readiness_label)
+        self.tool_table = QTreeWidget()
+        self.tool_table.setHeaderLabels(
+            ["Fundamentals tool", "Readiness", "Setup details", "Actions"]
+        )
+        self.tool_table.setAccessibleName("Fundamentals tools and direct GUI/Terminal actions")
+        self.tool_table.setRootIsDecorated(False)
+        self.tool_table.setUniformRowHeights(True)
+        content.addWidget(self.tool_table, 1)
+        analysis_actions = QHBoxLayout()
+        for title in ("SecDesk", "LowREA"):
+            action = QPushButton("Open " + title)
+            action.setAccessibleName("Open " + title)
+            action.setToolTip(
+                "Open external tool workflows"
+                if title == "SecDesk"
+                else "Open static binary inspection"
+            )
+            action.clicked.connect(lambda checked=False, page=title: self.navigate_title(page))
+            analysis_actions.addWidget(action)
+        analysis_actions.addStretch()
+        content.addLayout(analysis_actions)
         content.addWidget(refresh)
-        content.addStretch()
         self.stack.addWidget(dashboard)
         self.sidebar.currentItemChanged.connect(self._navigate)
         self.sidebar.setCurrentRow(0)
@@ -128,6 +156,7 @@ class MainWindow(QMainWindow):
             secdesk_panel = SecDeskPanel(view_model)
             secdesk_panel.navigate_requested.connect(self.navigate_title)
             self.register_view("SecDesk", secdesk_panel)
+            self.register_view("LowREA", LowreaPanel(view_model))
             self.register_view("Settings", desktop_controls.settings_panel)
             for keys, callback in (
                 ("Ctrl+K", self.command_palette),
@@ -200,20 +229,58 @@ class MainWindow(QMainWindow):
 
     def _show_tools(self, values: object) -> None:
         if isinstance(values, list):
+            tools = [value for value in values if isinstance(value, ToolView)]
+            ready = sum(value.available for value in tools)
             self.readiness_label.setText(
-                "\n".join(
-                    f"{value.title}: {value.reason or 'Ready'}"
-                    for value in values
-                    if isinstance(value, ToolView)
-                )
+                f"Fundamentals · {ready} ready · {len(tools)-ready} need setup"
             )
+            self.tool_table.clear()
+            for value in tools:
+                item = QTreeWidgetItem(
+                    [
+                        value.title,
+                        "Ready" if value.available else "Needs setup",
+                        value.reason or "Ready",
+                        "",
+                    ]
+                )
+                item.setToolTip(2, value.reason or "Ready")
+                self.tool_table.addTopLevelItem(item)
+                actions = QWidget()
+                row = QHBoxLayout(actions)
+                row.setContentsMargins(4, 4, 4, 4)
+                for label, terminal in (("Open GUI", False), ("Open in Terminal", True)):
+                    button = QPushButton(label)
+                    button.setAccessibleName(f"{label}: {value.title}")
+                    button.setToolTip(
+                        f"Open {value.title} {'command console' if terminal else 'GUI controls'}"
+                    )
+                    button.clicked.connect(
+                        lambda checked=False, key=value.id, mode=terminal: self.open_fundamental(
+                            key, mode
+                        )
+                    )
+                    row.addWidget(button)
+                self.tool_table.setItemWidget(item, 3, actions)
+            for column in (0, 1, 3):
+                self.tool_table.resizeColumnToContents(column)
+
+    def open_fundamental(self, tool_id: str, terminal: bool = False) -> None:
+        from frontend.views.tools.base import ToolPanel
+
+        panel = self.panels.get(tool_id)
+        if not isinstance(panel, ToolPanel):
+            return
+        self.stack.setCurrentWidget(panel)
+        title = next((title for identifier, title in PANELS if identifier == tool_id), "")
+        self.navigate_title(title)
+        if panel.terminal_controls.isHidden() == terminal:
+            panel.toggle_terminal()
 
     @pyqtSlot(object)
     def _show_health(self, health: object) -> None:
         if isinstance(health, HealthResponse):
-            self.health_label.setText(
-                f"Backend {health.status} · Version {health.version}\nInstance {health.instance_id}"
-            )
+            self.health_label.setText(f"Backend {health.status} · Toolkit v{health.version}")
             self.error_label.clear()
 
     def register_view(self, title: str, view: QWidget) -> None:

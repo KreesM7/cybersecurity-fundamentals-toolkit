@@ -2,6 +2,12 @@
 
 Seed inventory, not an authoritative upstream catalog. No tool parity has been verified.
 
+Delivered `inventory-artifact` CLI and `inspect_static` MCP/desktop producer provide
+partial artifact identity, PE/ELF layout, native instruction and ASCII-window
+observations. These are not signature-compatible replacements for the REA names
+below. tests/test_lowrea_static.py proves real decoder, CLI/MCP equality and HTTPS
+GUI behavior. Coverage remains partial; no full upstream operation is marked done.
+
 | REA name | LowREA tool | Status | Proving test |
 | --- | --- | --- | --- |
 | address_name | — | missing | — |

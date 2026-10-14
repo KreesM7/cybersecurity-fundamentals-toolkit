@@ -37,6 +37,8 @@ dependencies = [
   "urllib3==2.8.0",
   "beautifulsoup4==4.15.0",
   "argon2-cffi==25.1.0",
+  "capstone==5.0.9",
+  "mcp==2.3.0",
 ]
 
 [project.optional-dependencies]

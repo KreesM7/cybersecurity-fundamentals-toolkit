@@ -57,7 +57,7 @@ jobs:
         run: python -m uv run --no-sync python -m toolkit --self-test
       - name: Archive coverage
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: coverage-${{ matrix.os }}-${{ matrix.python }}
           path: |
@@ -94,7 +94,7 @@ jobs:
           work/provision-worker/bin/python -m toolkit_scapy_worker --help
       - name: Archive findings and explicit no-fix exceptions
         if: always()
-        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: dependency-audit
           path: work/dependency-audit/
